@@ -41,6 +41,15 @@ export function createRelay(opts: RelayOptions): (request: Request) => Promise<R
   const files = new Map<string, { nonce: string; ciphertext: string; hash: string }>();
   const nonces = new Map<string, { evm: string; expiresAt: number }>();
   const tokens = new Map<string, { evm: string; expiresAt: number }>();
+  /** State is in memory, so sequence numbers restart with the process. A client that sees a new instance starts over. */
+  const instance = bytesToHex(randomBytes(8)).slice(2);
+
+  /** The address a live bearer token was issued to, or undefined. */
+  function signedIn(request: Request): string | undefined {
+    const auth = request.headers.get("authorization") ?? "";
+    const session = tokens.get(auth.startsWith("Bearer ") ? auth.slice(7) : "");
+    return session && session.expiresAt >= nowMs() ? session.evm : undefined;
+  }
 
   async function route(request: Request): Promise<Response> {
     const url = new URL(request.url);
@@ -54,13 +63,26 @@ export function createRelay(opts: RelayOptions): (request: Request) => Promise<R
     if (kind === "bundles" && id) {
       const evm = toEvm(id);
       if (method === "PUT") {
-        const body = await readJson<{ bundle: Bundle }>(request, maxMessage * 4);
+        const body = await readJson<{ bundle: Bundle; spent?: unknown }>(request, maxMessage * 4);
+        let spent: number[] = [];
+        if (body.spent !== undefined) {
+          if (!Array.isArray(body.spent) || !body.spent.every((i) => Number.isInteger(i) && i >= 0 && i < ONE_TIME_KEYS)) {
+            return fail(400, "SPENT", "spent is a list of one-time indexes");
+          }
+          // Only the owner may retire entries, or a stranger could push every sender to the last-resort key.
+          const owner = signedIn(request);
+          if (!owner) return fail(401, "AUTH", "sign in to mark entries spent");
+          if (owner !== evm) return fail(403, "AUTH", "this is someone else's bundle");
+          spent = body.spent as number[];
+        }
         const hash = bundleHash(body.bundle);
         const onChain = await opts.chain.directory(evm);
         if (onChain.hash !== hash) return fail(409, "BUNDLE_HASH", "the bundle does not hash to the directory");
         if (!onChain.live) return fail(409, "BUNDLE_EXPIRED", "the directory's bundle has expired");
         const existing = bundles.get(evm);
-        bundles.set(evm, existing?.hash === hash ? existing : { bundle: body.bundle, hash, handed: new Set() });
+        const entry = existing?.hash === hash ? existing : { bundle: body.bundle, hash, handed: new Set<number>() };
+        for (const index of spent) entry.handed.add(index);
+        bundles.set(evm, entry);
         return json(200, { hash });
       }
       if (method === "GET") {
@@ -155,14 +177,12 @@ export function createRelay(opts: RelayOptions): (request: Request) => Promise<R
         return json(200, { seq });
       }
       if (method === "GET") {
-        const auth = request.headers.get("authorization") ?? "";
-        const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
-        const session = tokens.get(token);
-        if (!session || session.expiresAt < nowMs()) return fail(401, "AUTH", "sign in first");
-        if (session.evm !== evm) return fail(403, "AUTH", "this is someone else's inbox");
+        const owner = signedIn(request);
+        if (!owner) return fail(401, "AUTH", "sign in first");
+        if (owner !== evm) return fail(403, "AUTH", "this is someone else's inbox");
         const after = Number(url.searchParams.get("after") ?? "-1");
         const items = (inboxes.get(evm)?.items ?? []).filter((item) => item.seq > after);
-        return json(200, { items });
+        return json(200, { instance, items });
       }
     }
 

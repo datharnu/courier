@@ -285,6 +285,38 @@ test("a forged first message and a tampered later one are refused, and the real 
   assert.deepEqual(texts(await a.receive()), ["refused:AEAD", "genuine", "refused:COUNTER"]);
 });
 
+test("a restarted relay does not hand out entries the owner already used, and only the owner can retire them", async () => {
+  const first = relayFetch();
+  const b = client(bob, first);
+  await b.publishCard();
+  await withBundle(b);
+  const a = client(alice, first);
+  await a.publishCard();
+  await a.start(bob.evm, { t: "text", body: "before the restart" });
+  assert.deepEqual(texts(await b.receive()), ["before the restart"]);
+
+  const restarted = relayFetch();
+  (b as unknown as { http: Fetch }).http = restarted;
+  const bundle = (b as unknown as { prekeys: { bundle: unknown } }).prekeys.bundle;
+  const put = (headers: Record<string, string>) =>
+    restarted(`${BASE}/v1/bundles/${bob.evm}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json", ...headers },
+      body: JSON.stringify({ bundle, spent: [1, 2, 3] }),
+    });
+  assert.equal((await put({})).status, 401);
+  const m = client(mallory, restarted);
+  await m.signIn();
+  assert.equal((await put({ authorization: `Bearer ${(m as unknown as { token: string }).token}` })).status, 403);
+
+  await b.publishCard();
+  await b.publishBundle();
+  const again = client(alice, restarted);
+  await again.publishCard();
+  await again.start(bob.evm, { t: "text", body: "after the restart" });
+  assert.deepEqual(texts(await b.receive()), ["after the restart"]);
+});
+
 test("an invoice opens, and its ciphertext hash is not the hash of the memo", async () => {
   const http = relayFetch();
   const a = client(alice, http);

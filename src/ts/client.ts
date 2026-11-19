@@ -70,6 +70,7 @@ export class CourierClient {
   private prekeys?: Prekeys;
   private token?: string;
   private cursor = -1;
+  private instance?: string;
 
   constructor(opts: { relay: string; chain: ChainReader; identity: Identity; fetch?: typeof fetch; kemEvery?: number }) {
     this.relay = opts.relay.replace(/\/$/, "");
@@ -103,9 +104,26 @@ export class CourierClient {
     return card;
   }
 
+  /** Entries this device already accepted are retired on the relay, so a restarted relay does not hand them out again. */
   async publishBundle(): Promise<void> {
     if (!this.prekeys) throw new CourierError("BUNDLE_SHAPE", "no prekeys loaded");
-    await this.call("PUT", `/v1/bundles/${this.identity.evm}`, { bundle: this.prekeys.bundle });
+    const spent = [...this.prekeys.used].sort((a, b) => a - b);
+    if (spent.length === 0) {
+      await this.call("PUT", `/v1/bundles/${this.identity.evm}`, { bundle: this.prekeys.bundle });
+      return;
+    }
+    const put = () =>
+      this.call("PUT", `/v1/bundles/${this.identity.evm}`, { bundle: this.prekeys!.bundle, spent }, {
+        authorization: `Bearer ${this.token}`,
+      });
+    if (!this.token) await this.signIn();
+    try {
+      await put();
+    } catch (error) {
+      if (!(error instanceof RelayError) || error.status !== 401) throw error;
+      await this.signIn();
+      await put();
+    }
   }
 
   /** The peer's X25519 identity key, accepted only from a card the chain's keys verify. */
@@ -225,12 +243,29 @@ export class CourierClient {
   /** Every inbox item gets a result. A refused item is reported and skipped, never decrypted another way. */
   async receive(): Promise<Received[]> {
     if (!this.token) await this.signIn();
-    const { items } = await this.call<{ items: { seq: number; message: Wire }[] }>(
-      "GET",
-      `/v1/inbox/${this.identity.evm}?after=${this.cursor}`,
-      undefined,
-      { authorization: `Bearer ${this.token}` },
-    );
+    type Page = { instance: string; items: { seq: number; message: Wire }[] };
+    const read = () =>
+      this.call<Page>("GET", `/v1/inbox/${this.identity.evm}?after=${this.cursor}`, undefined, {
+        authorization: `Bearer ${this.token}`,
+      });
+    let page: Page;
+    try {
+      page = await read();
+    } catch (error) {
+      // A restarted relay forgets its tokens. Sign in once more; a second refusal is real.
+      if (!(error instanceof RelayError) || error.status !== 401) throw error;
+      await this.signIn();
+      page = await read();
+    }
+    if (page.instance !== this.instance) {
+      const fresh = this.instance !== undefined;
+      this.instance = page.instance;
+      if (fresh && this.cursor >= 0) {
+        this.cursor = -1;
+        page = await read();
+      }
+    }
+    const { items } = page;
     const out: Received[] = [];
     for (const item of items) {
       this.cursor = Math.max(this.cursor, item.seq);

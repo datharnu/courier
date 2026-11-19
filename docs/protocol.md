@@ -81,7 +81,7 @@ The relay checks what it stores, so honest clients are not handed junk. A bundle
 
 The relay is allowed to lie, delay and drop. The client treats a bundle whose hash is not the on-chain hash as a lie. It treats a card that the chain's keys do not verify, or that names a KEM key other than the registry's, as a lie. It shows that refusal and does not fall back to what was offered. If one entry is handed to two senders, the first handshake opens and the second is refused.
 
-The relay in this version keeps state in memory. A restart loses inboxes and files, and forgets which entries it has handed out. A forgotten entry can then be handed out twice. The recipient still refuses the second handshake.
+The relay in this version keeps state in memory. A restart loses inboxes and files, and forgets which entries it has handed out. When the owner publishes the bundle again, it signs in and names the entries it has already accepted, and the relay stops handing those out. Only the owner can do that, so a stranger cannot push every sender onto the last-resort key. Until the owner republishes, a forgotten entry can be handed out twice, and the recipient still refuses the second handshake. Each relay run has a random id. A client that sees a new id reads its inbox from the start, and signs in again when its token is refused.
 
 An optional delivery receipt is an ML-DSA signature by the recipient over `(conversationId, counter, ciphertext hash)`. The sender can store it. The demo records one.
 
