@@ -1,6 +1,4 @@
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { pqSign } from "@qorechain/qoresign";
 import { fetchKemKey } from "@qorechain/qoreseal/network";
 import {
@@ -14,16 +12,10 @@ import {
   type Hex,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { TESTNET, qorechainDiana } from "../../haven-pq-kit/src/ts/network.ts";
-import {
-  broadcast,
-  evmClient,
-  loadAccount,
-  loadSealKeys,
-  sendScopedContractTx,
-  withEvmWindow,
-} from "../../steward/scripts/lib/chain.ts";
-import { bundleHash, createBundle } from "../src/ts/bundle.ts";
+import { TESTNET, qorechainDiana } from "haven-pq-kit/network";
+import { broadcast, evmClient, loadAccount, loadSealKeys, sendScopedContractTx, withEvmWindow } from "./lib/chain.js";
+import { prekeyPath, writePrivate } from "./lib/secrets.js";
+import { bundleHash, createBundle } from "../src/ts/bundle.js";
 
 const DEPLOYER = "spike";
 const OWNER = "steward-vendor";
@@ -31,8 +23,7 @@ const FUND_UQOR = 1_000_000n;
 const MIN_OWNER_UQOR = 600_000n;
 const REPORT = "deployments/prekey-directory.json";
 const BUNDLE_OUT = `deployments/bundles/${OWNER}.json`;
-const SECRETS_DIR = join(homedir(), ".haven", "courier");
-const SECRETS_OUT = join(SECRETS_DIR, `${OWNER}.prekeys.json`);
+const SECRETS_OUT = prekeyPath(OWNER);
 /** A few minutes under the contract's 7-day cap, so block time drift cannot push it over. */
 const TTL = 7 * 24 * 60 * 60 - 600;
 const SIGNATURE_INVALID = toFunctionSelector("SignatureInvalid()");
@@ -104,13 +95,6 @@ function bank(address: string): Promise<bigint> {
 
 function save(report: Report): void {
   writeFileSync(REPORT, `${JSON.stringify(report, null, 2)}\n`);
-}
-
-function writePrivate(path: string, contents: string): void {
-  mkdirSync(SECRETS_DIR, { recursive: true, mode: 0o700 });
-  chmodSync(SECRETS_DIR, 0o700);
-  writeFileSync(path, contents, { mode: 0o600 });
-  chmodSync(path, 0o600);
 }
 
 async function main(): Promise<void> {

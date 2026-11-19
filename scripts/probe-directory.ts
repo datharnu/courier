@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { pqSign } from "@qorechain/qoresign";
 import { bytesToHex, encodeAbiParameters, encodeFunctionData, hexToBytes, keccak256, toBytes, type Address, type Hex } from "viem";
-import { qorechainDiana } from "../../haven-pq-kit/src/ts/network.ts";
-import { evmClient, loadAccount } from "../../steward/scripts/lib/chain.ts";
+import { qorechainDiana } from "haven-pq-kit/network";
+import { evmClient, loadAccount } from "./lib/chain.js";
 
 const ABI = [
   {

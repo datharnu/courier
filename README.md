@@ -8,12 +8,25 @@ If one side keeps sending and the other never answers, no step completes. Those 
 
 A file has its own 32-byte key. That key travels inside a ratchet message. It is never sealed to a long-term key.
 
-`PrekeyDirectory` is on testnet at `0x3d9a5821d0a24220a5f244a63a4a641d2acd9c2d`, with one real bundle published by `steward-vendor`. The hashes are in `docs/deployments.md`.
+The relay holds ciphertext and public keys, and is never trusted for either. Every bundle and card it returns is checked against the chain before anything is sealed. An inbox opens only to its owner, signed in with SIWQ and an ML-DSA-87 signature. The relay keeps state in memory in this version.
 
-Not built yet: the relay, groups, the web app, and MemoPay. The spike results are in `docs/spikes.md`. Nothing here is audited.
+`PrekeyDirectory` is on testnet at `0x3d9a5821d0a24220a5f244a63a4a641d2acd9c2d`, with one real bundle published by `steward-vendor`. `npm run live` ran `spike` and `steward-vendor` through the relay against the real chain. A swapped bundle was refused, then four messages and an invoice file went through. The hashes are in `docs/deployments.md`.
+
+Not built yet: groups, delivery receipts, the web app, and MemoPay. The spike results are in `docs/spikes.md`. Nothing here is audited.
+
+## Run it
+
+```bash
+git clone --recurse-submodules https://github.com/datharnu/courier && cd courier
+npm ci
+npm test            # the TypeScript tests and forge test, no chain needed
+npm run relay       # a relay on 127.0.0.1:8787 that reads qorechain-diana
+```
+
+`npm run live` and `npm run deploy:directory` need the accounts in `~/.haven`.
 
 ## Tests
 
-`npm run test:ts` covers the handshake and the ratchet. `npm run test:sol` covers the directory.
+`npm run test:ts` covers the handshake, the ratchet, the relay, and the client. Most of the relay tests are a relay lying: it swaps a bundle or a card, hands one entry to two senders, or delivers a forged or tampered message. `npm run test:sol` covers the directory.
 
 Apache-2.0.

@@ -1,6 +1,6 @@
 # Courier protocol
 
-The directory, the handshake, the ratchet, and file keys are in `src/`. The relay, groups, the web app, and MemoPay are not. The spike in `docs/spikes.md` is the only thing that has been sent to testnet.
+The directory, the handshake, the ratchet, file keys, the relay, and the client are in `src/`. Groups, delivery receipts, the web app, and MemoPay are not. The spike in `docs/spikes.md` is the only thing that has been sent to testnet.
 
 A message is readable only by the recipient's current device. The relay stores ciphertext. A key published later cannot open messages sent earlier.
 
@@ -71,9 +71,15 @@ A group is a set of pairwise conversations. A group message is encrypted once pe
 
 ## Relay
 
-The relay stores ciphertext under the recipient address. It never sees a key or a plaintext. Fetches are authenticated with Sign In With QoreChain, and a fetch for someone else's inbox is refused.
+The relay stores ciphertext under the recipient address. It never sees a key or a plaintext. Reading an inbox needs a Sign In With QoreChain token. The sign-in must carry an ML-DSA-87 signature that verifies under the account's on-chain key, and its nonce works once, for the address it was issued to. A read of someone else's inbox is refused.
 
-The relay is allowed to lie, delay and drop. The client treats a bundle whose hash is not the on-chain hash as a lie, and treats a KEM key that is not the registry key as a lie. It shows that refusal. It does not fall back to the offered key.
+Anyone can post to an inbox. A first message must be ML-DSA-signed by its sender, and a later one must pass its conversation's AEAD, so a stranger's post is refused, not read. The relay caps a message at 64 KiB, a file at 4 MiB, and an inbox at 1,000 items. That is the only spam control in this version.
+
+The relay checks what it stores, so honest clients are not handed junk. A bundle must hash to `PrekeyDirectory.current`. A recipient card must verify under the chain's ML-DSA key and name the registry KEM key. A file's id must be the keccak256 of its ciphertext. Those checks do not make the relay trusted. The client repeats every one against the chain itself.
+
+The relay is allowed to lie, delay and drop. The client treats a bundle whose hash is not the on-chain hash as a lie. It treats a card that the chain's keys do not verify, or that names a KEM key other than the registry's, as a lie. It shows that refusal and does not fall back to what was offered. If one entry is handed to two senders, the first handshake opens and the second is refused.
+
+The relay in this version keeps state in memory. A restart loses inboxes and files, and forgets which entries it has handed out. A forgotten entry can then be handed out twice. The recipient still refuses the second handshake.
 
 An optional delivery receipt is an ML-DSA signature by the recipient over `(conversationId, counter, ciphertext hash)`. The sender can store it. The demo records one.
 
@@ -90,4 +96,4 @@ An optional delivery receipt is an ML-DSA signature by the recipient over `(conv
 
 ## Not in this draft
 
-The relay, groups, the web app, and the memo payment. `MemoPay` will put the keccak256 of a Courier ciphertext on chain and nowhere the plaintext.
+Groups, delivery receipts, the web app, and the memo payment. `MemoPay` will put the keccak256 of a Courier ciphertext on chain and nowhere the plaintext.

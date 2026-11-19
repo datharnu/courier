@@ -12,8 +12,8 @@ import {
   type Hex,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { qorechainDiana } from "../../haven-pq-kit/src/ts/network.ts";
-import { evmClient, sendScopedContractTx, withEvmWindow } from "../../steward/scripts/lib/chain.ts";
+import { qorechainDiana } from "haven-pq-kit/network";
+import { evmClient, sendScopedContractTx, withEvmWindow } from "./lib/chain.js";
 
 const ABI = [
   {

@@ -8,12 +8,15 @@
   "scripts": {
     "spike": "tsx scripts/spike-seal.ts",
     "deploy:directory": "forge build && tsx scripts/deploy-directory.ts",
-    "test:ts": "node --import tsx --test test/ts/protocol.test.ts",
+    "relay": "tsx scripts/relay.ts",
+    "live": "tsx scripts/live-exchange.ts",
+    "test:ts": "node --import tsx --test test/ts/*.test.ts",
     "test:sol": "forge test",
     "test": "npm run test:ts && npm run test:sol",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@cosmjs/stargate": "0.39.0",
     "@noble/ciphers": "2.4.0",
     "@noble/hashes": "2.4.0",
     "@qorechain/pqc": "0.2.3",
@@ -24,6 +27,7 @@
     "viem": "2.47.6"
   },
   "devDependencies": {
+    "@types/node": "22.19.1",
     "tsx": "4.19.4",
     "typescript": "5.6.3"
   }

@@ -29,4 +29,17 @@ The stored hash is `0x9306826eb46977b32639a004ad992c868c5614d703fbb9a8e8cc08309b
 
 Inside the same window, before the publish, an `eth_call` of `publish` with one byte of the signature changed reverted with `0x37e8456b`, `SignatureInvalid()`. `scripts/probe-directory.ts` repeats that with a fresh hash and sends nothing.
 
+## A live exchange through the relay
+
+`npm run live` starts the relay on 127.0.0.1 and reads the real chain. `spike` and `steward-vendor` exchange messages through it, and the result is written to `deployments/live-exchange.json`. It sends no transactions.
+
+The first run was on 19 Nov 2026 at 20:47 UTC.
+
+1. A relay that swapped the vendor's bundle for another valid bundle with the same identity KEM key was refused with `BUNDLE_HASH`. Nothing was sealed.
+2. `spike` opened conversation `0xea94595b…798d3fcd` on one-time entry 1. The vendor's client read `PrekeyDirectory.current`, the KEM registry, and `pqcKeyStatus` for both accounts before it accepted.
+3. The vendor replied, then sent `INV-0007.json`, 84 bytes, as file `0x4a37b897…2662ca2a`. `spike` opened it and the hash matched.
+4. `spike` answered.
+
+The vendor's client then erased entry 1's secrets from `~/.haven/courier/steward-vendor.prekeys.json`.
+
 The bundle expires on 26 Nov 2026, 20:11 UTC. That is before judging. Run `npm run deploy:directory` again before a live demo. It publishes a new bundle and replaces the hash. The secret half of the bundle is in `~/.haven/courier/steward-vendor.prekeys.json`, mode 0600, outside the repository.

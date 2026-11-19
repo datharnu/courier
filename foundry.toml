@@ -2,17 +2,16 @@
 src = "src"
 test = "test"
 out = "out"
-libs = ["../haven-pq-kit/lib"]
+libs = ["lib"]
 solc_version = "0.8.28"
 optimizer = true
 optimizer_runs = 200
 via_ir = true
 remappings = [
-  "forge-std/=../haven-pq-kit/lib/forge-std/src/",
-  "haven-pq-kit/=../haven-pq-kit/src/",
-  "haven-pq-kit-test/=../haven-pq-kit/test/",
+  "forge-std/=lib/forge-std/src/",
+  "haven-pq-kit/=lib/haven-pq-kit/src/",
+  "haven-pq-kit-test/=lib/haven-pq-kit/test/",
 ]
-allow_paths = ["../haven-pq-kit"]
 
 [fuzz]
 runs = 256

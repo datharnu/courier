@@ -10,8 +10,8 @@ import {
 import { fetchKemKey, sealToAddresses } from "@qorechain/qoreseal/network";
 import { classicalKeyFromPrivate } from "@qorechain/qoresign";
 import { hexToBytes, type Hex } from "viem";
-import { CHAIN_ID, broadcast, loadAccount, loadSealKeys } from "../../haven-pq-kit/scripts/accounts.ts";
-import { TESTNET } from "../../haven-pq-kit/src/ts/network.ts";
+import { TESTNET } from "haven-pq-kit/network";
+import { CHAIN_ID, broadcast, loadAccount, loadSealKeys } from "./lib/chain.js";
 
 const SENDER = "spike";
 const RECIPIENT = "steward-vendor";
