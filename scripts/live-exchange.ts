@@ -63,7 +63,9 @@ function savePrekeys(name: string, stored: StoredPrekeys, used: Set<number>): vo
 function summary(items: Received[]): string[] {
   return items.map((item) => {
     if (!item.ok) return `refused ${item.code}`;
-    return item.payload.t === "text" ? `text "${item.payload.body}"` : `file ${item.payload.name} (${item.payload.size} bytes)`;
+    if (item.payload.t === "text") return `text "${item.payload.body}"`;
+    if (item.payload.t === "file") return `file ${item.payload.name} (${item.payload.size} bytes)`;
+    return `invoice ${item.payload.invoiceId}`;
   });
 }
 
@@ -115,10 +117,12 @@ async function main(): Promise<void> {
       steps.push({ step: "a relay swaps the vendor's bundle", result: [`refused ${code}, nothing sealed`] });
     }
 
-    const conversationId = await spike.start(recipient.evm, {
-      t: "text",
-      body: "Invoice INV-0007 is ready. Reply to confirm the payee.",
-    });
+    const conversationId = (
+      await spike.start(recipient.evm, {
+        t: "text",
+        body: "Invoice INV-0007 is ready. Reply to confirm the payee.",
+      })
+    ).conversationId;
     const first = await vendor.receive();
     savePrekeys(RECIPIENT, stored, used);
     steps.push({ step: "spike opens a conversation with the vendor", result: summary(first) });

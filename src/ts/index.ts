@@ -7,3 +7,5 @@ export { acceptHandshake, conversationOf, startHandshake } from "./handshake.js"
 export type { HandshakeMessage } from "./handshake.js";
 export { openFile, sealFile } from "./file.js";
 export type { FileBlob } from "./file.js";
+export { FUSD, STEWARD_GATE, checkInvoice, ciphertextHash, memoHashOf, signInvoice, verifyInvoice } from "./invoice.js";
+export type { Invoice } from "./invoice.js";

@@ -1,3 +1,4 @@
+import type { Registry } from "@cosmjs/proto-signing";
 import { StargateClient } from "@cosmjs/stargate";
 import { deriveSealKeys, type SealKeyPair } from "@qorechain/qoreseal";
 import {
@@ -46,9 +47,10 @@ export async function broadcast(
   account: UnifiedAccount,
   messages: NativeMessages,
   signMode: "hybrid" | "classical" = "hybrid",
+  registry?: Registry,
 ): Promise<string> {
   const auth = await accountSequence(account);
-  const signer = new EthNativeSigner(account, { signMode, rest: TESTNET.rest, signBytesVersion: "auto" });
+  const signer = new EthNativeSigner(account, { signMode, rest: TESTNET.rest, signBytesVersion: "auto", registry });
   const node = await StargateClient.connect(TESTNET.rpc);
   try {
     const result = await signer.signAndBroadcast(node, {

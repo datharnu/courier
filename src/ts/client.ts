@@ -1,12 +1,13 @@
 import { signRecipientCard, verifyRecipientCard, type RecipientCard, type SealKeyPair } from "@qorechain/qoreseal";
 import { createSiwqMessage, signSiwq, type ClassicalKey } from "@qorechain/qoresign";
-import { bytesToHex, hexToBytes, keccak256 } from "viem";
+import { bytesToHex, hexToBytes, keccak256, type Hex } from "viem";
 
 import { bundleHash, type Bundle, type BundleSecrets } from "./bundle.js";
 import { canonical, CourierError, isCourierError, utf8, type CourierCode } from "./bytes.js";
 import { toCosmos, toEvm, type ChainReader } from "./chain.js";
 import { openFile, sealFile, type FileBlob } from "./file.js";
 import { acceptHandshake, startHandshake, type HandshakeMessage } from "./handshake.js";
+import { checkInvoice, ciphertextHash, verifyInvoice, type Invoice } from "./invoice.js";
 import { type Envelope, type Session } from "./session.js";
 
 export type Identity = {
@@ -21,14 +22,26 @@ export type Prekeys = { bundle: Bundle; secrets: BundleSecrets; used: Set<number
 
 export type Payload =
   | { t: "text"; body: string }
-  | { t: "file"; id: string; key: string; hash: string; name: string; size: number };
+  | { t: "file"; id: string; key: string; hash: string; name: string; size: number }
+  | ({ t: "invoice" } & Invoice);
+
+/** What was just posted. `ciphertextHash` is the word MemoPay stores. */
+export type Posted = { ciphertext: Hex; ciphertextHash: Hex };
 
 type Wire =
   | { type: "handshake"; handshake: HandshakeMessage }
   | { type: "message"; from: string; conversationId: string; envelope: Envelope };
 
 export type Received =
-  | { ok: true; seq: number; from: string; conversationId: string; payload: Payload; first: boolean }
+  | {
+      ok: true;
+      seq: number;
+      from: string;
+      conversationId: string;
+      payload: Payload;
+      first: boolean;
+      ciphertextHash: Hex;
+    }
   | { ok: false; seq: number; from?: string; code: CourierCode | "WIRE"; reason: string };
 
 export class RelayError extends Error {
@@ -114,7 +127,8 @@ export class CourierClient {
     }
   }
 
-  async start(peer: string, payload: Payload): Promise<string> {
+  async start(peer: string, payload: Payload): Promise<Posted & { conversationId: string }> {
+    if (payload.t === "invoice") checkInvoice(payload);
     const evm = toEvm(peer);
     const peerX25519 = await this.verifiedX25519(evm);
     const { bundle, oneTimeIndex } = await this.call<{ bundle: Bundle; oneTimeIndex: number | null }>(
@@ -141,17 +155,19 @@ export class CourierClient {
     });
     await this.post(evm, { type: "handshake", handshake });
     this.sessions.set(session.conversationId, session);
-    return session.conversationId;
+    return { conversationId: session.conversationId, ...posted(handshake.ciphertext) };
   }
 
-  async send(conversationId: string, payload: Payload): Promise<void> {
+  async send(conversationId: string, payload: Payload): Promise<Posted> {
+    if (payload.t === "invoice") checkInvoice(payload);
     const session = this.session(conversationId);
     const envelope = session.send(utf8(canonical(payload)));
     await this.post(session.peer, { type: "message", from: this.identity.evm, conversationId, envelope });
+    return posted(envelope.ciphertext);
   }
 
-  async sendText(conversationId: string, body: string): Promise<void> {
-    await this.send(conversationId, { t: "text", body });
+  async sendText(conversationId: string, body: string): Promise<Posted> {
+    return this.send(conversationId, { t: "text", body });
   }
 
   /** The file is stored once. Each conversation gets only its 32-byte key, inside its own ratchet. */
@@ -231,7 +247,16 @@ export class CourierClient {
         if (!session) throw new CourierError("COUNTER", "no conversation with this id");
         if (toEvm(wire.from) !== session.peer) throw new CourierError("ADDRESS", "sender is not this conversation's peer");
         const payload = decode(session.receive(wire.envelope));
-        return { ok: true, seq, from: session.peer, conversationId: wire.conversationId, payload, first: false };
+        if (payload.t === "invoice") await verifyInvoice(this.chain, payload);
+        return {
+          ok: true,
+          seq,
+          from: session.peer,
+          conversationId: wire.conversationId,
+          payload,
+          first: false,
+          ciphertextHash: ciphertextHash(wire.envelope.ciphertext),
+        };
       }
       return { ok: false, seq, code: "WIRE", reason: "unknown item" };
     } catch (error) {
@@ -260,8 +285,19 @@ export class CourierClient {
       kemEvery: this.kemEvery,
     });
     if (this.sessions.has(session.conversationId)) throw new CourierError("ONE_TIME_REUSED", "conversation already open");
+    const payload = decode(plaintext);
+    // The session stays even when the invoice is refused, so a later message in this conversation still opens.
     this.sessions.set(session.conversationId, session);
-    return { ok: true, seq, from: sender, conversationId: session.conversationId, payload: decode(plaintext), first: true };
+    if (payload.t === "invoice") await verifyInvoice(this.chain, payload);
+    return {
+      ok: true,
+      seq,
+      from: sender,
+      conversationId: session.conversationId,
+      payload,
+      first: true,
+      ciphertextHash: ciphertextHash(handshake.ciphertext),
+    };
   }
 
   private session(conversationId: string): Session {
@@ -287,9 +323,17 @@ export class CourierClient {
   }
 }
 
+function posted(ciphertext: string): Posted {
+  return { ciphertext: ciphertext as Hex, ciphertextHash: ciphertextHash(ciphertext) };
+}
+
 function decode(bytes: Uint8Array): Payload {
   const value = JSON.parse(new TextDecoder().decode(bytes)) as Payload;
   if (value?.t === "text" && typeof value.body === "string") return value;
   if (value?.t === "file" && typeof value.id === "string" && typeof value.key === "string") return value;
-  throw new CourierError("BUNDLE_SHAPE", "payload is not a text or a file");
+  if (value?.t === "invoice") {
+    checkInvoice(value);
+    return value;
+  }
+  throw new CourierError("BUNDLE_SHAPE", "payload is not a text, a file, or an invoice");
 }

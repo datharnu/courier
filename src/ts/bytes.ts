@@ -9,6 +9,7 @@ export type CourierCode =
   | "COUNTER"
   | "FILE_HASH"
   | "IDENTITY_KEM"
+  | "INVOICE"
   | "KEM_STEP"
   | "KEY"
   | "ONE_TIME_INDEX"

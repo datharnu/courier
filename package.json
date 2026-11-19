@@ -8,6 +8,8 @@
   "scripts": {
     "spike": "tsx scripts/spike-seal.ts",
     "deploy:directory": "forge build && tsx scripts/deploy-directory.ts",
+    "deploy:memopay": "forge build && tsx scripts/deploy-memopay.ts",
+    "pay:memo": "tsx scripts/pay-memo.ts",
     "relay": "tsx scripts/relay.ts",
     "live": "tsx scripts/live-exchange.ts",
     "test:ts": "node --import tsx --test test/ts/*.test.ts",

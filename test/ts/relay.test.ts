@@ -4,11 +4,12 @@ import { before, test } from "node:test";
 import { deriveSealKeys } from "@qorechain/qoreseal";
 import { classicalKeyFromPrivate, createSiwqMessage, signSiwq } from "@qorechain/qoresign";
 import { deriveUnifiedAccount, generateMnemonic } from "@qorechain/sdk";
-import { bytesToHex, hexToBytes, type Hex } from "viem";
+import { bytesToHex, hexToBytes, keccak256, toBytes, type Hex } from "viem";
 
 import { bundleHash, createBundle } from "../../src/ts/bundle.js";
 import { toEvm, type ChainReader } from "../../src/ts/chain.js";
 import { CourierClient, RelayError, type Identity, type Received } from "../../src/ts/client.js";
+import { FUSD, STEWARD_GATE, signInvoice } from "../../src/ts/invoice.js";
 import { createRelay } from "../../src/ts/relay.js";
 
 const CHAIN_ID = "qorechain-diana";
@@ -116,7 +117,7 @@ test("two accounts exchange messages and a file through the relay", async () => 
   await b.publishCard();
   await withBundle(b);
 
-  const conversation = await a.start(bob.evm, { t: "text", body: "hello bob" });
+  const conversation = (await a.start(bob.evm, { t: "text", body: "hello bob" })).conversationId;
   const first = await b.receive();
   assert.deepEqual(texts(first), ["hello bob"]);
   assert.equal(first[0].ok && first[0].first, true);
@@ -244,7 +245,7 @@ test("a forged first message and a tampered later one are refused, and the real 
   await a.publishCard();
   await b.publishCard();
   await withBundle(b);
-  const conversation = await a.start(bob.evm, { t: "text", body: "real" });
+  const conversation = (await a.start(bob.evm, { t: "text", body: "real" })).conversationId;
 
   const inbox = async (who: CourierClient) => {
     await who.signIn();
@@ -282,4 +283,58 @@ test("a forged first message and a tampered later one are refused, and the real 
   await http(`${BASE}/v1/inbox/${alice.evm}`, { method: "POST", body: JSON.stringify({ message: genuine }) });
   await http(`${BASE}/v1/inbox/${alice.evm}`, { method: "POST", body: JSON.stringify({ message: genuine }) });
   assert.deepEqual(texts(await a.receive()), ["refused:AEAD", "genuine", "refused:COUNTER"]);
+});
+
+test("an invoice opens, and its ciphertext hash is not the hash of the memo", async () => {
+  const http = relayFetch();
+  const a = client(alice, http);
+  const b = client(bob, http);
+  await a.publishCard();
+  await b.publishCard();
+  await withBundle(b);
+  const opened = await a.start(bob.evm, { t: "text", body: "ready" });
+  assert.equal((await b.receive())[0].ok, true);
+
+  const memo = "Pay the registered payout.";
+  const invoice = signInvoice(bob.mldsaSecret, {
+    gate: STEWARD_GATE,
+    vendor: bob.evm,
+    payee: bob.evm,
+    token: FUSD,
+    amount: "10000",
+    invoiceId: keccak256(toBytes("courier-inv-0007")),
+    dueDate: Math.floor(Date.now() / 1000) + 86_400,
+    memo,
+  });
+  const posted = await b.send(opened.conversationId, { t: "invoice", ...invoice });
+  const got = await a.receive();
+  assert.equal(got[0].ok, true);
+  if (!got[0].ok || got[0].payload.t !== "invoice") throw new Error("invoice did not open");
+  assert.equal(got[0].payload.memo, memo);
+  assert.equal(got[0].ciphertextHash, posted.ciphertextHash);
+  assert.notEqual(got[0].ciphertextHash, got[0].payload.memoHash);
+  assert.equal(keccak256(posted.ciphertext), posted.ciphertextHash);
+});
+
+test("a bad vendor signature is refused and a later message still opens", async () => {
+  const http = relayFetch();
+  const a = client(alice, http);
+  const b = client(bob, http);
+  await a.publishCard();
+  await b.publishCard();
+  await withBundle(b);
+  const invoice = signInvoice(mallory.mldsaSecret, {
+    gate: STEWARD_GATE,
+    vendor: alice.evm,
+    payee: bob.evm,
+    token: FUSD,
+    amount: "10000",
+    invoiceId: keccak256(toBytes("forged-inv")),
+    dueDate: Math.floor(Date.now() / 1000) + 86_400,
+    memo: "Pay someone else.",
+  });
+  const opened = await a.start(bob.evm, { t: "invoice", ...invoice });
+  assert.deepEqual(texts(await b.receive()), ["refused:INVOICE"]);
+  await a.sendText(opened.conversationId, "still here");
+  assert.deepEqual(texts(await b.receive()), ["still here"]);
 });

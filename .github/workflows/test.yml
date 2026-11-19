@@ -20,5 +20,5 @@ jobs:
       - run: npm run typecheck
       - name: handshake, ratchet, relay and the refusals (no chain)
         run: npm run test:ts
-      - name: forge test (PrekeyDirectory against the mocked precompiles)
+      - name: forge test (PrekeyDirectory and MemoPay)
         run: forge test

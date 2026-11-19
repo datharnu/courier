@@ -1,6 +1,6 @@
 # Courier protocol
 
-The directory, the handshake, the ratchet, file keys, the relay, and the client are in `src/`. Groups, delivery receipts, the web app, and MemoPay are not. The spike in `docs/spikes.md` is the only thing that has been sent to testnet.
+The directory, the handshake, the ratchet, file keys, the relay, the client, and MemoPay are in `src/`. Groups, delivery receipts, and the web app are not. The directory and MemoPay are on testnet. The hashes are in `docs/deployments.md`.
 
 A message is readable only by the recipient's current device. The relay stores ciphertext. A key published later cannot open messages sent earlier.
 
@@ -13,6 +13,8 @@ A message is readable only by the recipient's current device. The relay stores c
 | Prekey bundle | The account's ML-DSA-87 key, over `(chainid, directory, owner, keccak256(bundle), expiry)` | `PrekeyDirectory` calls `pqcVerify` at publish. The relay's copy is kept only if it hashes to the stored value |
 | First message of a conversation | The sender's ML-DSA-87 key, via QoreSign | The recipient, against the sender's on-chain key |
 | Later messages | The ratchet's MAC, inside the AEAD | The recipient. A bad tag is a drop, not a decrypt |
+| Invoice | The vendor's ML-DSA-87 key, over `VendorSig.encode` `(chainid, gate, vendor, payee, token, amount, invoiceId, dueDate, memoHash)` | The recipient, against the vendor's on-chain key, before the invoice is payable |
+| Memo payment | Nothing. The payer spends their own tokens. The memo's integrity is keccak256 of the Courier ciphertext | `MemoPay` stores that hash. It does not see the memo |
 
 The bundle signature uses the same shape `BundleSpike.publish` already ran on testnet.
 
@@ -93,7 +95,21 @@ An optional delivery receipt is an ML-DSA signature by the recipient over `(conv
 - An AAD with the sender and recipient swapped fails.
 - After N messages, the identity ML-KEM key, the identity X25519 key, and the ML-DSA key together are not enough to open messages 1..N, or any file sent with them.
 - A copy made before the offering secret existed cannot open the reply that completes the step, or anything after it. A copy that already holds that secret can finish that one step, and cannot follow a later secret it does not hold.
+- An invoice whose memo text does not hash to `memoHash`, or whose vendor signature does not match the vendor's on-chain key, is refused.
+- `MemoPay` refuses a zero hash, a zero amount, a payment to the payer, to itself, or to the token, a second record of the same ciphertext by the same payer, and a token that does not move the exact amount from the payer to the payee.
+
+## Memo payment
+
+`MemoPay` sends fUSD from the payer to the payee and stores the keccak256 of a Courier ciphertext. That ciphertext is the encrypted memo. The contract has no function that accepts the memo, the ciphertext, or an invoice. The call is four words: token, payee, amount, hash.
+
+The memo is a Courier message of type `invoice`. It carries the vendor-signed invoice Steward already verifies: vendor, payee, token, amount, invoice id, due date, the keccak256 of the memo text, and the ML-DSA-87 signature. The recipient checks that hash against the memo text, then checks the signature against the vendor's current on-chain key. A mismatch is refused. The plaintext stays on the device that can open the ratchet.
+
+The same payer cannot record the same ciphertext twice. Another payer can commit to the same hash, because the record is keyed by the payer and the hash. The contract never holds the tokens. The payee's balance must rise by the amount, the payer's must fall by the amount, and `MemoPay`'s own balance must not change. A token that does anything else is refused.
+
+This payment does not mark the invoice used in Steward's PayGate. The gate holds a different balance and still requires its own check. An invoice paid here can still be paid there until Steward's adapter skips it.
+
+The hash commits to the ciphertext, not to the words inside it. Someone who has not opened the message can confirm the hash and nothing more.
 
 ## Not in this draft
 
-Groups, delivery receipts, the web app, and the memo payment. `MemoPay` will put the keccak256 of a Courier ciphertext on chain and nowhere the plaintext.
+Groups, delivery receipts, and the web app.
