@@ -1,0 +1,12 @@
+{
+  "sender": "qor143f0ghn8slqguwez73087dvq8lqnuuukqdu9fl",
+  "recipient": "qor17zwvy05e9fzerfzksdkhygm92wvapwusvh4zfv",
+  "senderKemBytes": 1568,
+  "recipientKemBytes": 1568,
+  "publishHash": "21C0F931CDAAD36BE49FD6BC348EF0025124DAE3FF76167B1F57C84976633790",
+  "plaintextBytes": 44,
+  "envelopeBytes": 1764,
+  "envelopeSizeFormula": 1764,
+  "textBytes": 2361,
+  "senderCouldOpen": false
+}

@@ -1,0 +1,11 @@
+node_modules
+dist
+out
+cache
+broadcast
+.env
+*.env
+.DS_Store
+*.tsbuildinfo
+cards/
+deployments/*.local.json

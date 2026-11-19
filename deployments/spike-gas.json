@@ -1,0 +1,12 @@
+{
+  "openHash": "BCAAEA63156CDDF1592F9BA60CBD901664DB3656D570C515583688611F93846C",
+  "closeHash": "8E8B5AE73EE5D09472366CE3C165C082A757D91D819D8B7D71B78153E795DF53",
+  "contract": "0xea1ca181ca3cc636df65eb68af4921275dfbcad9",
+  "createHash": "0x8a88fe4c6c55e3df14e2e6a84197df0c62b25810cc97df884623cce37c11633e",
+  "createGas": 312801,
+  "createGasUsed": 312801,
+  "publishHash": "0x83b37bf6c8e8d177558ecddf1371d5fcc74dffb5aa03b87e6fd85bac32d4093f",
+  "publishGas": 241603,
+  "publishGasUsed": 241603,
+  "bundleHash": "0x182f99e4aefceeb5579e9ebe38842fa91f560bf0526e4ae0bf4f3c4898d7cb38"
+}
