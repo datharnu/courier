@@ -1,6 +1,6 @@
 # Courier protocol
 
-The directory, the handshake, the ratchet, file keys, the relay, the client, and MemoPay are in `src/`. Groups, delivery receipts, and the web app are not. The directory and MemoPay are on testnet. The hashes are in `docs/deployments.md`.
+The directory, the handshake, the ratchet, file keys, groups, delivery receipts, safety numbers, the relay, the client, `MemoPay` and `DeliveryReceipts` are in `src/`. The web app is not. The directory, MemoPay and DeliveryReceipts are on testnet. The hashes are in `docs/deployments.md`.
 
 A message is readable only by the recipient's current device. The relay stores ciphertext. A key published later cannot open messages sent earlier.
 
@@ -69,7 +69,7 @@ Within a direction, messages are applied in counter order. A copy of A made befo
 
 A file gets its own random 32-byte key. The file is AEAD'd with that key and stored on the relay. The key and the file's hash travel inside an ordinary ratchet message to each recipient. The file key is never sealed to a long-term key, so a key stolen later opens no file sent earlier.
 
-A group is a set of pairwise conversations. A group message is encrypted once per member, through that member's own ratchet, with a group id in the AAD. A large file is stored once, and only the 32-byte key is sent per member. Removing someone means they are left out of later messages and get no later file keys. Files and messages they already opened stay opened. There is no claim otherwise. The demo group has three members.
+A group is a set of pairwise conversations. A group message is encrypted once per member, through that member's own ratchet, with a group id in the AAD. A large file is stored once, and only the 32-byte key is sent per member. Removing someone means they are left out of later messages and get no later file keys. Files and messages they already opened stay opened. There is no claim otherwise. `npm run live:group` ran a three-member group on testnet, removed one member, and that member's next post was refused. The hashes are in `docs/deployments.md`.
 
 ## Relay
 
@@ -83,12 +83,12 @@ The relay is allowed to lie, delay and drop. The client treats a bundle whose ha
 
 The relay in this version keeps state in memory. A restart loses inboxes and files, and forgets which entries it has handed out. When the owner publishes the bundle again, it signs in and names the entries it has already accepted, and the relay stops handing those out. Only the owner can do that, so a stranger cannot push every sender onto the last-resort key. Until the owner republishes, a forgotten entry can be handed out twice, and the recipient still refuses the second handshake. Each relay run has a random id. A client that sees a new id reads its inbox from the start, and signs in again when its token is refused.
 
-An optional delivery receipt is an ML-DSA signature by the recipient over `(conversationId, counter, ciphertext hash)`. The sender can store it. The demo records one.
+An optional delivery receipt is an ML-DSA signature by the recipient over `(conversationId, counter, ciphertext hash)`. The sender can store it. `DeliveryReceipts` checks that signature with `pqcVerify` and stores who submitted it. `npm run live:group` recorded one on testnet. A tampered signature and a second record of the same receipt were both refused.
 
 ## What a test has to refuse
 
 - An outsider, holding neither device key, opens nothing.
-- A KEM key swapped by the REST proxy is refused, and the real key from a direct read still works.
+- A KEM key swapped by the REST proxy (haven-pq-kit's `createRestProxy`) is refused, and the same proxy when honest, and a direct read, still work.
 - A bundle whose bytes do not hash to the chain is refused.
 - A one-time entry handed to two senders opens the first handshake and refuses the second.
 - A replayed message and a message with a skipped counter are refused.
@@ -112,4 +112,4 @@ The hash commits to the ciphertext, not to the words inside it. Someone who has 
 
 ## Not in this draft
 
-Groups, delivery receipts, and the web app.
+The web app (`apps/web`), Playwright tests, the share link and the fest directory.

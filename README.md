@@ -14,7 +14,17 @@ The relay holds ciphertext and public keys, and is never trusted for either. Eve
 
 `PrekeyDirectory` is on testnet at `0x3d9a5821d0a24220a5f244a63a4a641d2acd9c2d`, with one real bundle published by `steward-vendor`. `npm run live` ran `spike` and `steward-vendor` through the relay against the real chain. A swapped bundle was refused, then four messages and an invoice file went through. The hashes are in `docs/deployments.md`.
 
-Not built yet: groups, delivery receipts, and the web app. The spike results are in `docs/spikes.md`. Nothing here is audited.
+Groups, delivery receipts and safety numbers are built and tested. `npm run live:group` ran a three-member group on testnet between `spike`, `steward-vendor` and `courier-carol`: a message and a file, a delivery receipt recorded in `DeliveryReceipts` at `0x06b52afc4a151b0efa260e2adcdf2d477632cb56`, a removal, and the removed member's post refused. The hashes are in `docs/deployments.md`. Not built yet: the web app (`apps/web`), Playwright tests, the share link and the fest directory. The spike results are in `docs/spikes.md`. Nothing here is audited.
+
+## Limitations
+
+- If the ratchet slips, forward secrecy comes only from one-time prekeys that have already been used up. Each used one-time entry's secrets are erased when its handshake opens. The last-resort prekey is not erased, so a handshake sealed to it is protected only until that prekey is rotated with the next bundle.
+- Counters must match exactly. A replayed or skipped message is refused, and Courier keeps no skipped-message keys, so one dropped message stalls that direction of the conversation for good. The conversation has to be started again.
+- If one side keeps sending and the other never replies, no ML-KEM step completes. Those messages rely on the symmetric chain only, so a stolen ratchet state opens them until a reply arrives.
+- The relay keeps its state in memory. A restart loses inboxes and files. It is not the stateless `relay/` service the design describes.
+- Group membership is decided by the group's admin, and each member's device keeps its own copy. A removed member keeps every message and file they already opened.
+- A forwarded invoice still verifies, because the vendor's signature does not name who sent the message. The money is still locked to the signed payee.
+- Safety numbers are modelled on Signal's numeric fingerprints but use SHA-256, not SHA-512. They are not compatible with Signal.
 
 ## Run it
 
@@ -25,10 +35,10 @@ npm test            # the TypeScript tests and forge test, no chain needed
 npm run relay       # a relay on 127.0.0.1:8787 that reads qorechain-diana
 ```
 
-`npm run live`, `npm run deploy:directory`, `npm run deploy:memopay`, and `npm run pay:memo` need the accounts in `~/.haven`.
+`npm run live`, `npm run deploy:directory`, `npm run deploy:memopay`, `npm run deploy:receipts`, `npm run fund -- <name>`, `npm run pay:memo`, and `npm run live:group` need the accounts in `~/.haven`.
 
 ## Tests
 
-`npm run test:ts` covers the handshake, the ratchet, the relay, the client, and invoices. Most of the relay tests are a relay lying: it swaps a bundle or a card, hands one entry to two senders, or delivers a forged or tampered message. `npm run test:sol` covers the directory and MemoPay, including an invariant that the contract never holds tokens.
+`npm run test:ts` covers the handshake, the ratchet, the relay, the client, invoices, groups, delivery receipts, safety numbers and pinned byte vectors in `vectors/protocol.json`. Most of the relay tests are a relay lying: it swaps a bundle or a card, hands one entry to two senders, or delivers a forged or tampered message. `npm run test:sol` covers `PrekeyDirectory`, `MemoPay` and `DeliveryReceipts`, with invariant suites for the directory and MemoPay, including an invariant that MemoPay never holds tokens.
 
 Apache-2.0.

@@ -1,0 +1,11 @@
+{
+  "network": "qorechain-diana",
+  "deliveryReceipts": "0x06b52afc4a151b0efa260e2adcdf2d477632cb56",
+  "deployer": "0xaC52f45E6787c08E3B22f45e7f35803Fc13e7396",
+  "deploy": {
+    "openHash": "55EE81BB9B349C7A536CF0D6A5D04D2C75F81A19C9957BF90EE36DC305B4C04B",
+    "createHash": "0x5a337df9f24a0e8cae648c3fe2d145f4ce4182a3602184efcb172f8f86e1bc07",
+    "gasUsed": 443818,
+    "closeHash": "6A13C6A213400930D79A361990806040F058C9F49CAC317DCB03C1445D8A0E35"
+  }
+}

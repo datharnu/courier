@@ -28,6 +28,7 @@ export type HandshakeMessage = {
   oneTimeIndex: number | null;
   nonce: string;
   ciphertext: string;
+  groupId?: string;
   signature: string;
 };
 
@@ -46,9 +47,11 @@ export function startHandshake(args: {
   now: number;
   plaintext: Uint8Array;
   kemEvery?: number;
+  groupId?: string;
 }): { handshake: HandshakeMessage; session: Session } {
   const sender = expectAddress(args.sender.address);
   const recipient = expectAddress(args.recipient.address);
+  const boundGroup = args.groupId === undefined ? undefined : expectKey(args.groupId, 32, "groupId");
   checkBundle(args.bundle, args.chainHash, args.registryKem, args.now);
   const index = checkIndex(args.oneTimeIndex);
   const target = encapsulationTarget(args.bundle, index);
@@ -80,7 +83,10 @@ export function startHandshake(args: {
       kemCiphertext: bytesToHex(kemCiphertext),
       oneTimeIndex: index,
       nonce: bytesToHex(nonce),
-      ciphertext: bytesToHex(seal(first.key, nonce, aadBytes(sender, recipient, conversationId, 0), args.plaintext)),
+      ciphertext: bytesToHex(
+        seal(first.key, nonce, aadBytes(sender, recipient, conversationId, 0, undefined, undefined, boundGroup), args.plaintext),
+      ),
+      ...(boundGroup ? { groupId: boundGroup } : {}),
     };
     wipe(first.key);
     wipe(chains.aToB.chain);
@@ -155,13 +161,14 @@ export function acceptHandshake(args: {
   const chains = splitRoot(handshakeRoot(terms));
   const first = peek(chains.aToB.chain);
   const conversationId = conversationOf(sender, recipient, args.chainHash, handshake.ephemeralPublic);
+  const boundGroup = handshake.groupId === undefined ? undefined : expectKey(handshake.groupId, 32, "groupId");
   const nonce = fromHex(handshake.nonce);
   let plaintext: Uint8Array;
   try {
     plaintext = open(
       first.key,
       nonce,
-      aadBytes(sender, recipient, conversationId, 0),
+      aadBytes(sender, recipient, conversationId, 0, undefined, undefined, boundGroup),
       fromHex(handshake.ciphertext),
     );
   } catch (err) {
@@ -226,6 +233,7 @@ function transcript(message: Omit<HandshakeMessage, "signature">): Uint8Array {
       bundleHash: message.bundleHash,
       ciphertext: message.ciphertext,
       ephemeralPublic: message.ephemeralPublic,
+      ...(message.groupId !== undefined ? { groupId: message.groupId } : {}),
       kemCiphertext: message.kemCiphertext,
       nonce: message.nonce,
       oneTimeIndex: message.oneTimeIndex,

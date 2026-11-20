@@ -1,4 +1,5 @@
 export { CourierError, canonical, isCourierError } from "./bytes.js";
+export { kemKeyOverRest } from "./chain.js";
 export { ONE_TIME_KEYS, bundleHash, createBundle, validateBundle } from "./bundle.js";
 export type { Bundle, BundleSecrets } from "./bundle.js";
 export { KEM_EVERY, Session } from "./session.js";
@@ -9,3 +10,8 @@ export { openFile, sealFile } from "./file.js";
 export type { FileBlob } from "./file.js";
 export { FUSD, STEWARD_GATE, checkInvoice, ciphertextHash, memoHashOf, signInvoice, verifyInvoice } from "./invoice.js";
 export type { Invoice } from "./invoice.js";
+export { RECEIPT_DOMAIN, checkReceipt, encodeReceipt, signReceipt, verifyReceipt } from "./receipt.js";
+export type { DeliveryReceipt } from "./receipt.js";
+export { MLDSA_PUBLIC_BYTES, SAFETY_ITERATIONS, fingerprint, safetyNumber, safetyNumberFor } from "./safety.js";
+export { checkGroupId, checkGroupPayload, newGroupId, normalizeMembers } from "./group.js";
+export type { GroupFilePayload, GroupInfo, GroupPayload, GroupStatePayload, GroupTextPayload } from "./group.js";

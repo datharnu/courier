@@ -1,0 +1,109 @@
+{
+  "network": "qorechain-diana",
+  "ranAt": "2026-11-20T12:05:59.528Z",
+  "relay": "in-process, real HTTP on 127.0.0.1, state in memory",
+  "directory": "0x3d9a5821d0a24220a5f244a63a4a641d2acd9c2d",
+  "deliveryReceipts": "0x06b52afc4a151b0efa260e2adcdf2d477632cb56",
+  "steps": [
+    {
+      "step": "spike creates a three-member group",
+      "result": [
+        "group.state 0x4d3a0e94",
+        "group.state 0x4d3a0e94"
+      ]
+    },
+    {
+      "step": "spike sends a group message",
+      "result": [
+        "group.text 0x4d3a0e94",
+        "group.text 0x4d3a0e94"
+      ]
+    },
+    {
+      "step": "spike sends a group file",
+      "result": [
+        "opened, hash matches",
+        "opened, hash matches"
+      ]
+    },
+    {
+      "step": "the vendor signs a receipt and spike records it",
+      "result": [
+        "receipt #1"
+      ]
+    },
+    {
+      "step": "spike removes carol",
+      "result": [
+        "group.state 0x4d3a0e94"
+      ]
+    },
+    {
+      "step": "spike sends a message and a file after the removal",
+      "result": [
+        "opened, hash matches"
+      ]
+    },
+    {
+      "step": "carol posts after being removed",
+      "result": [
+        "refused GROUP",
+        "refused GROUP"
+      ]
+    }
+  ],
+  "ok": true,
+  "receipt": {
+    "conversationId": "0xee9e929e97f3b026bd1c537e98d628c60005d8d522b74a4104d94055012cb714",
+    "counter": 1,
+    "ciphertextHash": "0xfc27eb2fe70148486add26083d5b15ccdbd8e5a2ad9b913280fe9349fb4e6e4f",
+    "recipient": "0xf09cc23e992a4591a456836d7223655399d0bb90",
+    "openHash": "B794E7BF8F7E88E2F5BA19CB08767E2849D14AAE2AA435E96A62FABEE43CEC51",
+    "recordHash": "0x3dfdb6bdf8a11a81792129083642f706a9b4547a62d4d8ebbe3eceb645566a89",
+    "gasUsed": 288262,
+    "closeHash": "19899043358A3BA0E192B52728EB0A80A184564A4C3D5379DA4A59E8E9C6D536",
+    "readBack": {
+      "submitter": "0xac52f45e6787c08e3b22f45e7f35803fc13e7396",
+      "recordedAt": 1795176375
+    },
+    "refusedTamperedSignature": "0x37e8456b",
+    "refusedDuplicate": "0x05a64c20fcc38f7349ad17d9a3856ce1534b8785596f0bc0b5e10b25c781451bd65c8e37"
+  },
+  "members": {
+    "admin": {
+      "name": "spike",
+      "cosmos": "qor143f0ghn8slqguwez73087dvq8lqnuuukqdu9fl",
+      "evm": "0xac52f45e6787c08e3b22f45e7f35803fc13e7396"
+    },
+    "member": {
+      "name": "steward-vendor",
+      "cosmos": "qor17zwvy05e9fzerfzksdkhygm92wvapwusvh4zfv",
+      "evm": "0xf09cc23e992a4591a456836d7223655399d0bb90"
+    },
+    "removed": {
+      "name": "courier-carol",
+      "cosmos": "qor1tacy6fv8x0jveznhdmyrqc2yep83awk07v3tf4",
+      "evm": "0x5f704d258733e4cc8a776ec8306144c84f1ebacf"
+    }
+  },
+  "groupId": "0x4d3a0e94e5f4dbeb76d18d970f439fe5a96974109db08e8c3924b288fe3314c0",
+  "conversationIds": {
+    "0x5f704d258733e4cc8a776ec8306144c84f1ebacf": "0x0fa07424344bb0746d5901f65a6c1551bbb543f1790c47dedb13ad161326b730",
+    "0xf09cc23e992a4591a456836d7223655399d0bb90": "0xee9e929e97f3b026bd1c537e98d628c60005d8d522b74a4104d94055012cb714"
+  },
+  "fileIds": [
+    "0xc52b4782b82ef146616dc66fcefe984287c636494f7239e2c04c30098436e907",
+    "0xb8c1a0f8c51f32949d8a8b258aad0e0ee090422d64e5d76b32a7c98675b15658"
+  ],
+  "oneTimeEntriesUsed": {
+    "steward-vendor": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "courier-carol": [
+      0
+    ]
+  }
+}

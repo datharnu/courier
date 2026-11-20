@@ -65,7 +65,9 @@ function summary(items: Received[]): string[] {
     if (!item.ok) return `refused ${item.code}`;
     if (item.payload.t === "text") return `text "${item.payload.body}"`;
     if (item.payload.t === "file") return `file ${item.payload.name} (${item.payload.size} bytes)`;
-    return `invoice ${item.payload.invoiceId}`;
+    if (item.payload.t === "invoice") return `invoice ${item.payload.invoiceId}`;
+    if (item.payload.t === "receipt") return `receipt #${item.payload.counter}`;
+    return `${item.payload.t} ${item.payload.groupId.slice(0, 10)}`;
   });
 }
 

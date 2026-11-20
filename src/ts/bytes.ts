@@ -8,12 +8,14 @@ export type CourierCode =
   | "BUNDLE_SHAPE"
   | "COUNTER"
   | "FILE_HASH"
+  | "GROUP"
   | "IDENTITY_KEM"
   | "INVOICE"
   | "KEM_STEP"
   | "KEY"
   | "ONE_TIME_INDEX"
   | "ONE_TIME_REUSED"
+  | "RECEIPT"
   | "SENDER_CARD"
   | "SIGNATURE";
 

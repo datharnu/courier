@@ -21,6 +21,7 @@ export type Envelope = {
   ciphertext: string;
   kemPublic?: string;
   kemCiphertext?: string;
+  groupId?: string;
 };
 
 export type SessionInit = {
@@ -103,7 +104,8 @@ export class Session {
     return copy;
   }
 
-  send(plain: Uint8Array): Envelope {
+  send(plain: Uint8Array, groupId?: string): Envelope {
+    const boundGroup = groupId === undefined ? undefined : expectKey(groupId, 32, "groupId");
     const counter = this.sendN;
     let sendRoot = this.sendRoot.slice();
     let sendChain = this.sendChain.slice();
@@ -139,7 +141,7 @@ export class Session {
 
     const next = peek(sendChain);
     const nonce = freshNonce();
-    const aad = aadBytes(this.self, this.peer, this.conversationId, counter, kemPublic, kemCiphertext);
+    const aad = aadBytes(this.self, this.peer, this.conversationId, counter, kemPublic, kemCiphertext, boundGroup);
     const ciphertext = seal(next.key, nonce, aad, plain);
     wipe(next.key);
     wipe(sendChain);
@@ -160,6 +162,7 @@ export class Session {
       ciphertext: hex(ciphertext),
       ...(kemPublic ? { kemPublic: hex(kemPublic) } : {}),
       ...(kemCiphertext ? { kemCiphertext: hex(kemCiphertext) } : {}),
+      ...(boundGroup ? { groupId: boundGroup } : {}),
     };
   }
 
@@ -167,6 +170,7 @@ export class Session {
     if (!Number.isSafeInteger(envelope.counter) || envelope.counter !== this.recvN) {
       throw new CourierError("COUNTER", `expected counter ${this.recvN}`);
     }
+    const boundGroup = envelope.groupId === undefined ? undefined : expectKey(envelope.groupId, 32, "groupId");
     const nonce = fromHex(envelope.nonce, 24, "nonce");
     const ciphertext = fromHex(envelope.ciphertext, undefined, "ciphertext");
     if (ciphertext.length < 16) throw new CourierError("AEAD", "ciphertext is too short");
@@ -196,7 +200,7 @@ export class Session {
     }
 
     const next = peek(recvChain);
-    const aad = aadBytes(this.peer, this.self, this.conversationId, envelope.counter, kemPublic, kemCiphertext);
+    const aad = aadBytes(this.peer, this.self, this.conversationId, envelope.counter, kemPublic, kemCiphertext, boundGroup);
     let plain: Uint8Array;
     try {
       plain = open(next.key, nonce, aad, ciphertext);

@@ -43,7 +43,19 @@ export function toCosmos(address: string): string {
   return address.startsWith("qor1") ? address : evmToQor(address);
 }
 
-export function testnetReader(opts: { client: PublicClient; directory: string; rest?: string }): ChainReader {
+/** Reads the ML-KEM-1024 registry key over REST. `fetch` lets a proxy or a test sit in between. */
+export async function kemKeyOverRest(evm: string, opts: { rest: string; fetch?: typeof fetch }): Promise<string> {
+  const status = await fetchKemKey({ rest: opts.rest, address: toCosmos(toEvm(evm)), fetch: opts.fetch });
+  if (!status.registered || !status.publicKey) throw new CourierError("IDENTITY_KEM", `no KEM key for ${evm}`);
+  return bytesToHex(status.publicKey);
+}
+
+export function testnetReader(opts: {
+  client: PublicClient;
+  directory: string;
+  rest?: string;
+  restFetch?: typeof fetch;
+}): ChainReader {
   const rest = opts.rest ?? TESTNET.rest;
   return {
     chainId: TESTNET.chainId,
@@ -53,9 +65,7 @@ export function testnetReader(opts: { client: PublicClient; directory: string; r
       return hexToBytes(key.pubkey);
     },
     async kemKey(evm) {
-      const status = await fetchKemKey({ rest, address: toCosmos(toEvm(evm)) });
-      if (!status.registered || !status.publicKey) throw new CourierError("IDENTITY_KEM", `no KEM key for ${evm}`);
-      return bytesToHex(status.publicKey);
+      return kemKeyOverRest(evm, { rest, fetch: opts.restFetch });
     },
     async directory(evm) {
       const data = encodeFunctionData({ abi: CURRENT_ABI, functionName: "current", args: [toEvm(evm) as Address] });

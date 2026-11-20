@@ -64,15 +64,18 @@ export function aadBytes(
   counter: number,
   kemPublic?: Uint8Array,
   kemCiphertext?: Uint8Array,
+  groupId?: string,
 ): Uint8Array {
-  return concat(
+  const parts = [
     addressBytes(sender),
     addressBytes(recipient),
     hexBytes(conversationId, 32),
     u32(counter),
     prefixed(kemPublic),
     prefixed(kemCiphertext),
-  );
+  ];
+  if (groupId !== undefined) parts.push(hexBytes(groupId, 32));
+  return concat(...parts);
 }
 
 export function seal(key: Uint8Array, nonce: Uint8Array, aad: Uint8Array, plain: Uint8Array): Uint8Array {
