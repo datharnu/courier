@@ -22,3 +22,5 @@ jobs:
         run: npm run test:ts
       - name: forge test (PrekeyDirectory, MemoPay and DeliveryReceipts)
         run: forge test
+      - name: contracts reach ML-DSA only through the precompiles, no ecrecover
+        run: npm run cbom:check

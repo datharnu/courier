@@ -1,0 +1,18 @@
+{
+  "network": "qorechain-diana",
+  "directory": "0x3d9a5821d0a24220a5f244a63a4a641d2acd9c2d",
+  "owner": "qor1tacy6fv8x0jveznhdmyrqc2yep83awk07v3tf4",
+  "ownerEvm": "0x5f704d258733e4cc8a776ec8306144c84f1ebacf",
+  "refusedForgedSignature": "eth_call reverted with SignatureInvalid() 0x37e8456b",
+  "bundleHash": "0x157c35bd5c1ffd5eb7606d33bc93183096184fc438155048e5d5bd5f07dbf6f0",
+  "expiry": 1795779952,
+  "openHash": "38610C76C6C777DCBD1AF75512207C953E980621A62166FB816E723BE76B2A9C",
+  "publishHash": "0x994a39fc67a0082ac29cb0932ce95e1e4d8f1df0893325b808d4fb89b835adf0",
+  "gasUsed": 280805,
+  "closeHash": "067A4144D4C8A9B4EE42CA8B708DA775E6E7187F5BD449FEFD99C0CBBC265FE8",
+  "readBack": {
+    "hash": "0x157c35bd5c1ffd5eb7606d33bc93183096184fc438155048e5d5bd5f07dbf6f0",
+    "expiry": 1795779952,
+    "live": true
+  }
+}

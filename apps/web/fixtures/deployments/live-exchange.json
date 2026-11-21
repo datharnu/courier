@@ -1,0 +1,62 @@
+{
+  "network": "qorechain-diana",
+  "ranAt": "2026-11-19T20:47:23.642Z",
+  "relay": "in-process, real HTTP on 127.0.0.1, state in memory",
+  "directory": "0x3d9a5821d0a24220a5f244a63a4a641d2acd9c2d",
+  "sender": {
+    "name": "spike",
+    "cosmos": "qor143f0ghn8slqguwez73087dvq8lqnuuukqdu9fl",
+    "evm": "0xac52f45e6787c08e3b22f45e7f35803fc13e7396"
+  },
+  "recipient": {
+    "name": "steward-vendor",
+    "cosmos": "qor17zwvy05e9fzerfzksdkhygm92wvapwusvh4zfv",
+    "evm": "0xf09cc23e992a4591a456836d7223655399d0bb90"
+  },
+  "bundleHashOnChain": "0x9306826eb46977b32639a004ad992c868c5614d703fbb9a8e8cc08309b13e79f",
+  "bundleExpiry": 1795723898,
+  "oneTimeEntriesUsed": [
+    1
+  ],
+  "conversationId": "0xea94595b438b9e77edf96f9b339f708b76dcc9ff34233ef4e0936175798d3fcd",
+  "fileId": "0x4a37b8976236c0d89bae9e0bc8f47ade1d66a6947f2bf7b97c1d05382662ca2a",
+  "chainReads": [
+    "PrekeyDirectory.current(vendor) through eth_call",
+    "pqcKeyStatus for both accounts, possession proven, 2,592-byte ML-DSA-87 keys",
+    "the KEM registry for both accounts, checked against each recipient card's SHA3-256"
+  ],
+  "steps": [
+    {
+      "step": "a relay swaps the vendor's bundle",
+      "result": [
+        "refused BUNDLE_HASH, nothing sealed"
+      ]
+    },
+    {
+      "step": "spike opens a conversation with the vendor",
+      "result": [
+        "text \"Invoice INV-0007 is ready. Reply to confirm the payee.\""
+      ]
+    },
+    {
+      "step": "the vendor replies",
+      "result": [
+        "text \"Confirmed. Pay the registered payout address.\""
+      ]
+    },
+    {
+      "step": "the vendor sends the invoice as a file",
+      "result": [
+        "file INV-0007.json (84 bytes)",
+        "opened, hash matches"
+      ]
+    },
+    {
+      "step": "spike answers",
+      "result": [
+        "text \"Received. Queued for payment.\""
+      ]
+    }
+  ],
+  "ok": true
+}
