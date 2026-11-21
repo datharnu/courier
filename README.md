@@ -6,6 +6,8 @@ Track: Encrypted Apps, [Build Before Q-Day](https://build.qorechain.io/). Reposi
 
 Network `qorechain-diana`, EVM chain id 9800. The directory, the memo payment, and the delivery receipt are on testnet. The message contents are not. The relay in this version keeps its state in memory on the machine that runs it. Nothing here has been through the dashboard audit.
 
+The site in this repository replays the recorded run. It does not send a message. The public copy is https://courier-fawn-psi.vercel.app.
+
 The relay will hold ciphertext. It is never trusted for a key. Every bundle and card it returns is checked against the chain before anything is sealed.
 
 ## Judge it without our keys
@@ -30,7 +32,34 @@ npm run web
 
 `npm run live` and `npm run live:group` talk to the real chain and need the accounts in `~/.haven`. They are not the judge path. Their reports are already in `deployments/`.
 
-Two published bundles expire before or around judging. The vendor bundle expires at Unix time 1795723898, 26 November 2026, 20:11 UTC. Carol's expires at 1795779952, 27 November 2026, 11:45 UTC. A live demo after those times needs `npm run deploy:directory` again. The recorded hashes do not. The secret half of a bundle is in `~/.haven`, mode 0600, and is not in the repository.
+The receipt page checks the two published bundles and receipt `0x3dfdb6bdf8a11a81792129083642f706a9b4547a62d4d8ebbe3eceb645566a89`. Verify this step reads the signature from that transaction. It does not call the relay and it does not sign. The standing line states the recorded expiry, 26 November 2026, 20:11 UTC for the vendor and 27 November 2026, 11:45 UTC for Carol. Only the check result says whether `current()` is live or expired. The signature can still be checked after the expiry.
+
+## On the web
+
+Import the repository on Vercel with the root directory set to `apps/web`. The install is `npm ci` and the build is `npm run build`. There is no environment variable. The page holds no key. The recorded files are also copied under `apps/web/fixtures/deployments/` so the build does not need the parent folder. Do not set a root `vercel.json`.
+
+The public copy is https://courier-fawn-psi.vercel.app. Opened on 21 November 2026. **Verify all** on `/app/receipt` finished at 390px and at 1440px. The vendor bundle, Carol's bundle, and the delivery receipt each passed fetched, decoded, key read, signature verified, and recorded. `current()` was live for both bundles. The standing lines stated the recorded expiry. Horizontal overflow was 0. No step said "Could not reach the testnet".
+
+Two published bundles expire before or around judging. The vendor bundle expires at Unix time 1795723898, 26 November 2026, 20:11 UTC. Carol's expires at 1795779952, 27 November 2026, 11:45 UTC. The recorded hashes do not. The secret half of a bundle is in `~/.haven`, mode 0600, and is not in the repository.
+
+## Live through judging
+
+The recorded exchange, the memo payment, and the group receipt stay valid. They do not expire.
+
+A judge's two identities publish their own bundles in the browser at the start of a visit. That page is not built yet. Those identities are not the vendor and not Carol.
+
+The project's own bundles are renewed on this calendar, and not before a person says go. The contract allows at most 7 days, so one publish cannot last until 15 December.
+
+| Run | Command | Account |
+| --- | --- | --- |
+| 26 November 2026, after 20:11 UTC | `npm run deploy:directory` | vendor `qor17zwvy05e9fzerfzksdkhygm92wvapwusvh4zfv` |
+| 27 November 2026, after 11:45 UTC | `npm run deploy:directory courier-carol` | Carol `qor1tacy6fv8x0jveznhdmyrqc2yep83awk07v3tf4` |
+| 3 December 2026 | `npm run deploy:directory` | vendor |
+| 4 December 2026, after the expiry set on 27 November | `npm run deploy:directory courier-carol` | Carol |
+| 9 December 2026 | `npm run deploy:directory` | vendor |
+| 10 December 2026, after the expiry set on 4 December | `npm run deploy:directory courier-carol` | Carol |
+
+Carol's command returns the old file and does not broadcast while that file is still live. The vendor command publishes even if the old bundle is still live. The fee for each publish is an open and a close at 180000 uqor, plus the EVM gas. The last publishes used 280769 gas (vendor) and 280805 gas (Carol).
 
 ## What was measured
 
@@ -200,7 +229,7 @@ The files and conversation ids are in [docs/deployments.md](docs/deployments.md)
 
 ## Stack
 
-Solidity on Foundry. TypeScript on Node 22. `@noble/ciphers` and `@noble/hashes`. `@qorechain/pqc` 0.2.3, `qoreseal` 0.1.0, `qoresign` 0.1.0, `sdk` 0.14.0. haven-pq-kit v0.1.0. viem 2.47.6. The site is in `apps/web`.
+Solidity on Foundry. TypeScript on Node 22. `@noble/ciphers` and `@noble/hashes`. `@qorechain/pqc` 0.2.3, `qoreseal` 0.1.0, `qoresign` 0.1.0, `sdk` 0.14.0, `mcp` 0.1.1. `@qorechain/qorescan` 0.1.0 checks the contracts. haven-pq-kit v0.1.0. viem 2.47.6. The site is in `apps/web`. The kit map is [docs/kits.md](docs/kits.md).
 
 `BundleSpike` is the earlier contract that published the same signed message shape. `PrekeyDirectory` checks that shape.
 
@@ -238,6 +267,9 @@ Pinned protocol bytes are in `vectors/protocol.json`.
 | `docs/deployments.md` | Every hash, with gas and the read-backs |
 | `docs/DEMO.md` | How to show it |
 | `docs/spikes.md` | The early spikes |
+| `docs/kits.md` | Which QoreChain kits this repository uses |
+| `scripts/cbom.ts` | The contract cryptography check |
+| `scripts/evidence.ts` | Re-reads the recorded transaction hashes |
 | `THREAT_MODEL.md` | Who can still open a message |
 | `AI_USAGE.md` | What was generated, and what a person decided |
 | `vectors/protocol.json` | The pinned bytes |
@@ -250,23 +282,24 @@ MemoPay's invariant includes that the contract never holds tokens. The payment i
 - A live exchange that refused a swapped bundle, then carried three texts and one invoice file.
 - A memo payment of 10,000 base units whose chain data is a ciphertext hash.
 - A three-member group: message, file, receipt, removal, and a refused post from the removed member.
-- A replay site that does not send.
+- A public site at https://courier-fawn-psi.vercel.app. On 21 November 2026, **Verify all** on `/app/receipt` checked the vendor publish, Carol's publish, and receipt `0x3dfdb6bdf8a11a81792129083642f706a9b4547a62d4d8ebbe3eceb645566a89`. All three signatures passed, and `current()` was live for both bundles. The relay was not called.
 - Contract tests and protocol tests, including a relay that lies.
+- `npm run cbom:check` passed on 21 November 2026. It refuses `ecrecover` and any contract cryptography outside Keccak and ML-DSA through the two precompiles. `npm run evidence` re-read the recorded transaction hashes the same day: 30 passed, 0 failed. It sends nothing.
 
 Not built, and not claimed:
 
-- Playwright tests.
+- A Haven family line. No practice receipt is recorded in `deployments/`.
 - A share link and a fest directory.
 - A relay that survives a restart.
 - Skipped-message recovery.
 - A dashboard audit.
-- Bundles that stay live through judging without a new publish. Renew before 26 November 2026 if a live demo still needs `current` to be true.
+- Project bundles that stay live through 15 December on their own. The calendar is in [Live through judging](#live-through-judging). A publish lasts at most 7 days.
 
 ## Credits
 
 Written during the fest, November 2026. It builds on:
 
-- **QoreChain kits:** `@qorechain/sdk`, `@qorechain/pqc`, `@qorechain/qoreseal`, `@qorechain/qoresign`.
+- **QoreChain kits:** `@qorechain/sdk`, `@qorechain/pqc`, `@qorechain/qoreseal`, `@qorechain/qoresign`, `@qorechain/mcp`. `@qorechain/qorescan` checks the contracts.
 - **haven-pq-kit v0.1.0:** https://github.com/datharnu/haven-pq-kit. The `PqAuth` and `PqQuorum` interface follows the public design of [qore-pq-kit](https://github.com/Adityaakr/qore-pq-kit) by Adityaakr, Apache-2.0. The implementation, tests, `VendorSig`, and recipient-card checks were written for Haven.
 - **Other libraries:** `@noble/ciphers`, `@noble/hashes`, viem, `@cosmjs/stargate`, forge-std, and TypeScript.
 
