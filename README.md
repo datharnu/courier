@@ -285,10 +285,10 @@ MemoPay's invariant includes that the contract never holds tokens. The payment i
 - A public site at https://courier-fawn-psi.vercel.app. On 21 November 2026, **Verify all** on `/app/receipt` checked the vendor publish, Carol's publish, and receipt `0x3dfdb6bdf8a11a81792129083642f706a9b4547a62d4d8ebbe3eceb645566a89`. All three signatures passed, and `current()` was live for both bundles. The relay was not called.
 - Contract tests and protocol tests, including a relay that lies.
 - `npm run cbom:check` passed on 21 November 2026. It refuses `ecrecover` and any contract cryptography outside Keccak and ML-DSA through the two precompiles. `npm run evidence` re-read the recorded transaction hashes the same day: 30 passed, 0 failed. It sends nothing.
+- Courier carried one file for Haven Escrow on 21 November 2026. Escrow `0x14312980702C0e2c9b85f3478ba9396e59054706`. Receipt `0x95a37e72f573830a73e491de42d0f7da7ad33713c80ed35d8626103c90391452` records ciphertext `0x7d0cf82a1ba8b2bddbf7b4c2f2cd356c877771494be8ac2181c1cd758fb05b74`. HavenEscrow does not read DeliveryReceipts. The hashes are in `deployments/courier-pays.json`. No directory bundle was published and no relay was hosted.
 
 Not built, and not claimed:
 
-- A Haven family line. No practice receipt is recorded in `deployments/`.
 - A share link and a fest directory.
 - A relay that survives a restart.
 - Skipped-message recovery.
@@ -299,6 +299,7 @@ Not built, and not claimed:
 
 Written during the fest, November 2026. It builds on:
 
+- **Haven family:** Courier carried one file for Haven Escrow `0x14312980702C0e2c9b85f3478ba9396e59054706`. The receipt is on DeliveryReceipts. HavenEscrow does not read that contract. The hashes are in `deployments/courier-pays.json`.
 - **QoreChain kits:** `@qorechain/sdk`, `@qorechain/pqc`, `@qorechain/qoreseal`, `@qorechain/qoresign`, `@qorechain/mcp`. `@qorechain/qorescan` checks the contracts.
 - **haven-pq-kit v0.1.0:** https://github.com/datharnu/haven-pq-kit. The `PqAuth` and `PqQuorum` interface follows the public design of [qore-pq-kit](https://github.com/Adityaakr/qore-pq-kit) by Adityaakr, Apache-2.0. The implementation, tests, `VendorSig`, and recipient-card checks were written for Haven.
 - **Other libraries:** `@noble/ciphers`, `@noble/hashes`, viem, `@cosmjs/stargate`, forge-std, and TypeScript.

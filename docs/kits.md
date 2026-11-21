@@ -32,4 +32,4 @@ Versions are the pins in `package.json`. A file path is an import in this reposi
 - `@qorechain/qore-cli`. It is not in this `package.json`. `npm run evidence` calls MCP in-process.
 - `create-qorechain-dapp`. It is not in `package.json`.
 - `@qorechain/wallet-adapter` and `@qorechain/qorex-types`. They are not in `package.json`. The replay site sends nothing.
-- A recorded handoff from Haven Escrow. `src/` does not name HavenEscrow. HavenEscrow does not read PrekeyDirectory, MemoPay, or DeliveryReceipts. No practice receipt is in `deployments/`, so there is no Haven family line.
+- A contract call from HavenEscrow into Courier. `src/` does not name HavenEscrow. HavenEscrow does not read PrekeyDirectory, MemoPay, or DeliveryReceipts. One practice receipt is in `deployments/courier-pays.json`. Courier carried that file. The page, not HavenEscrow, read `receipt()`.
