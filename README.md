@@ -267,12 +267,10 @@ Not built, and not claimed:
 Written during the fest, November 2026. It builds on:
 
 - **QoreChain kits:** `@qorechain/sdk`, `@qorechain/pqc`, `@qorechain/qoreseal`, `@qorechain/qoresign`.
-- **haven-pq-kit v0.1.0:** https://github.com/datharnu/haven-pq-kit.
+- **haven-pq-kit v0.1.0:** https://github.com/datharnu/haven-pq-kit. The `PqAuth` and `PqQuorum` interface follows the public design of [qore-pq-kit](https://github.com/Adityaakr/qore-pq-kit) by Adityaakr, Apache-2.0. The implementation, tests, `VendorSig`, and recipient-card checks were written for Haven.
 - **Other libraries:** `@noble/ciphers`, `@noble/hashes`, viem, `@cosmjs/stargate`, forge-std, and TypeScript.
 
 The handshake is the X3DH shape plus ML-KEM-1024, and the ratchet is the double-ratchet shape. The code was written for QoreChain accounts and for an ML-DSA binding. It is not a copy of Signal, and the safety numbers are not compatible with Signal.
-
-No code was copied from another entrant.
 
 ## Licence
 
