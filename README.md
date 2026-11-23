@@ -6,7 +6,11 @@ Courier delivers the invoice; the payment goes through `MemoPay`, which stores o
 
 Tola sends a confidential invoice (`INV-0007.json`, 84 bytes) to a vendor through an untrusted relay. When the relay tries to swap in a different prekey bundle, Courier catches the mismatch and refuses before sealing a single byte — and when the invoice is paid, only a 32-byte ciphertext hash touches the chain, never the text.
 
-[Try it: catch a lying relay](https://courier-fawn-psi.vercel.app/app/try) · [Live demo](https://courier-fawn-psi.vercel.app) · [Judge in 5 minutes](#judge-it-in-5-minutes) · [Run locally](#run-locally) · [What works today](#what-works-today)
+[Demo video (2:32)](https://drive.google.com/file/d/1P5WucUYNApsJwSpqOjGl3RPNHud-PMBK/view) · [Try it: catch a lying relay](https://courier-fawn-psi.vercel.app/app/try) · [Live demo](https://courier-fawn-psi.vercel.app) · [Judge in 5 minutes](#judge-it-in-5-minutes) · [Run locally](#run-locally) · [What works today](#what-works-today)
+
+<p align="center">
+  <a href="https://drive.google.com/file/d/1P5WucUYNApsJwSpqOjGl3RPNHud-PMBK/view"><img src="docs/video-thumb.jpg" width="720" alt="Courier demo video (2:32): click to watch on Google Drive" /></a>
+</p>
 
 <p align="center">
   <a href="https://courier-fawn-psi.vercel.app"><img src="docs/screen-home.png" width="880" alt="Courier home screen showing 'Only the current device can read it' and live testnet receipt proof with 0 bytes of plaintext on chain." /></a>
@@ -139,7 +143,7 @@ Built for Build Before Q-Day (`https://build.qorechain.io/`), category bounty En
 | ML-DSA key binding | `PrekeyDirectory.publish` and `DeliveryReceipts.record` verify ML-DSA-87 signatures via `pqcVerify`; flipped signature bytes revert `SignatureInvalid` (`0x37e8456b`). | Binding covers bundle hashes and receipt ciphertext hashes; message contents never touch the chain. |
 | Client-side encryption and decryption | Clients seal and open all messages, files, and invoices locally; relay holds ciphertext only; `MemoPay` stores only `keccak256(ciphertext)` (132-byte calldata). | Safety numbers use SHA-256 (not Signal SHA-512); groups have no on-chain membership contract. |
 | Public GitHub repository under MIT or Apache-2.0 | `https://github.com/datharnu/courier`, Apache-2.0 (`LICENSE`). | No QCAI dashboard audit has been run (not required for Encrypted Apps). |
-| README, testnet addresses, and video (up to 3 min) | This single-file `README.md` holds all addresses, hashes, and limits; shot list in `docs/DEMO.md`. | Video recorded (2:32); link not yet added to the project page (due before 2 December 2026). |
+| README, testnet addresses, and video (up to 3 min) | This single-file `README.md` holds all addresses, hashes, and limits; shot list in `docs/DEMO.md`. | [Demo video](https://drive.google.com/file/d/1P5WucUYNApsJwSpqOjGl3RPNHud-PMBK/view) (2:32). Motion-graphics explainer built from the recorded evidence, with synthetic narration (ElevenLabs); not a screen recording of a live session. |
 
 ---
 
@@ -255,7 +259,7 @@ Live scripts (`npm run live`, `npm run deploy:directory`, `npm run deploy:memopa
 
 ## Roadmap
 
-1. Before 2 December 2026: record and publish the ≤3-minute demo film (`docs/DEMO.md`) and renew vendor/Carol bundles on schedule through judging.
+1. Renew the vendor, Carol and demo-vendor bundles on schedule through judging. The [demo video](https://drive.google.com/file/d/1P5WucUYNApsJwSpqOjGl3RPNHud-PMBK/view) (2:32) is done.
 2. Browser guest flow: `/app/try` runs the protocol in the browser with two public demo identities; next, let visitors publish their own ephemeral browser bundles.
 3. Durable relay: replace the single local state file with hosted, replicated queues.
 4. External audit: audit `PrekeyDirectory`, `MemoPay`, `DeliveryReceipts`, and the TypeScript ratchet before mainnet use.
@@ -273,6 +277,8 @@ Credits: `@qorechain/sdk` 0.14.0, `@qorechain/pqc` 0.2.3, `@qorechain/qoreseal` 
 ## AI disclosure
 
 Written across Cursor agent sessions (Claude, including Claude Opus 5.5 on 20 Nov 2026) under human direction, with the human approving every network transaction, commit, and push; later README restructuring used Antigravity. The `/app/try` page, the demo identity and publish scripts, and the copy repositioning were written with Claude Opus 5.5 on 23 November 2026 under the same rule: no transaction was sent. Human decisions included fail-closed rules, strict counter matching (no skipped-message keys), keeping `MemoPay` separate from Steward's `PayGate`, using `haven-pq-kit` v0.1.0, and adding `courier-carol` for the group run. Bugs caught and fixed during development included signing the `spent` prekey list on republish, adding relay instance IDs for restart detection, and routing the swapped-key test through the real REST proxy.
+
+The demo video (23 November 2026) was built in Remotion with Claude Code (Claude Opus 5.5) from this README's recorded evidence, and the human reviewed and approved every script. Its narration is a synthetic ElevenLabs voice; the background track is Mixkit's "Vastness".
 
 ---
 

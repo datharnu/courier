@@ -8,6 +8,7 @@ Courier delivers encrypted invoices and documents between QoreChain addresses, a
 
 ## Demo URLs
 
+- Video (2:32): https://drive.google.com/file/d/1P5WucUYNApsJwSpqOjGl3RPNHud-PMBK/view
 - Try it: catch a lying relay (client and vendor in one page, protocol runs in the browser): https://courier-fawn-psi.vercel.app/app/try
   - The two identities on this page (`courier-demo-vendor`, `courier-demo-client`) are public demo keys, committed on purpose in `apps/web/fixtures/demo/identities.json`. They hold nothing.
   - Demo vendor `qor1ee5ypk25qvppjs7hqk7fcvf354rkcc9sqcak0u` / `0xce6840d95403021943d705bc9c3131a5476c60b0`; demo client `qor1t5parjalqguchl9aptfw4wd5wwn9uhahusfkdu` / `0x5d03d1cbbf02398bfcbd0ad2eab9b473a65e5fb7`.
