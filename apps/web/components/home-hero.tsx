@@ -22,9 +22,9 @@ export function HomeHero({ facts }: { facts: RecordFacts | null }) {
           </p>
 
           <h1 className="settle mx-auto text-[clamp(2.25rem,5.4vw,4.35rem)] leading-[1.06] font-semibold tracking-[-0.035em] text-balance text-ink">
-            <span className="block">Only the current device</span>
+            <span className="block">Encrypted invoices</span>
             <span className="relative inline-block whitespace-nowrap">
-              can read it.
+              that get paid.
               <PencilLine />
             </span>
           </h1>
@@ -33,8 +33,9 @@ export function HomeHero({ facts }: { facts: RecordFacts | null }) {
             className="settle mx-auto mt-8 max-w-[46ch] text-[16.5px] leading-relaxed text-muted sm:text-[17px]"
             style={{ animationDelay: "180ms" }}
           >
-            Stop harvest-now, decrypt-later attacks. Courier seals messages, files, and invoice memos between QoreChain
-            addresses—so a key stolen later opens nothing sent earlier.
+            Courier delivers encrypted invoices and documents between QoreChain addresses. The payment goes through
+            MemoPay and the delivery receipt is recorded on chain; only ciphertext hashes touch the chain. Courier checks
+            the recipient&rsquo;s key bundle on chain first, so a relay cannot swap in its own key.
           </p>
 
           <div
@@ -42,11 +43,17 @@ export function HomeHero({ facts }: { facts: RecordFacts | null }) {
             style={{ animationDelay: "320ms" }}
           >
             <Link
-              href="/app"
+              href="/app/try"
               className="group inline-flex min-h-12 items-center gap-2 rounded-xl bg-brand px-6 text-[15px] font-semibold text-on-brand transition-all hover:brightness-110 active:scale-[0.98]"
             >
-              <span>Open App</span>
+              <span>Try it: catch a lying relay</span>
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            </Link>
+            <Link
+              href="/app"
+              className="inline-flex min-h-12 items-center rounded-xl border border-line-strong bg-surface/85 px-5 text-[15px] font-medium text-ink backdrop-blur-sm transition-colors hover:border-brand/50 hover:bg-surface-elevated"
+            >
+              Open App
             </Link>
             <Link
               href="/app/receipt"

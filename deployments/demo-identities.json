@@ -1,0 +1,32 @@
+{
+  "network": "qorechain-diana",
+  "directory": "0x3d9a5821d0a24220a5f244a63a4a641d2acd9c2d",
+  "warning": "Demo keys: public on purpose, hold nothing. Anyone can sign as these two testnet accounts; they carry only test QOR for fees.",
+  "vendor": {
+    "cosmos": "qor1ee5ypk25qvppjs7hqk7fcvf354rkcc9sqcak0u",
+    "evm": "0xce6840d95403021943d705bc9c3131a5476c60b0",
+    "fundHash": "7B2BE7A6C5685DBF882E18C2C89754BA545D63B2F943E701AEC3B76D1605D955",
+    "mldsaHash": "9D4C276F2CFBE056359FDAF679859313498FE0D99503013B0645A3929CBE207E",
+    "kemHash": "9D191E8D705D00650A733B4E82657472B25516694A90A5EDEA50F29CB258A58E"
+  },
+  "client": {
+    "cosmos": "qor1t5parjalqguchl9aptfw4wd5wwn9uhahusfkdu",
+    "evm": "0x5d03d1cbbf02398bfcbd0ad2eab9b473a65e5fb7",
+    "fundHash": "A92E99F3843BC5DF61E74057A1778AA1CA674BE3BC072C6EE2AD20EAF4953CF0",
+    "mldsaHash": "5AAF1F86A33B6F4C136B43A5560AA502635CA99C341D5B56BA313AC17E6356BD"
+  },
+  "publish": {
+    "bundleHash": "0x0f13517a19a3a1df5a333553b0bff2384cb577cd076deac06a988a6fee4a4175",
+    "expiry": 1796041377,
+    "openHash": "67BBC33BD204AE3CD0A99A94A82BCED4F853D74DD82F177EEB9FC6D6B4DE0AD2",
+    "publishHash": "0x823fea9cbc7db2deac4fbbad47871f10766a378d1447f700aeaa8c21d6d7b08d",
+    "gasUsed": 280781,
+    "closeHash": "64884B7D62F6870C67CAB6763F3959B93260DB3FBA9BCBEC98A130B544A70659",
+    "readBack": {
+      "hash": "0x0f13517a19a3a1df5a333553b0bff2384cb577cd076deac06a988a6fee4a4175",
+      "expiry": 1796041377,
+      "live": true
+    },
+    "refusedForgedSignature": "eth_call reverted with SignatureInvalid() 0x37e8456b"
+  }
+}

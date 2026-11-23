@@ -1,12 +1,12 @@
 # Courier
 
-**Courier sends encrypted invoices, files, and messages between QoreChain addresses, and can tie each one to an on-chain payment or signed delivery receipt. It checks the recipient's key bundle on chain before encrypting, so a relay can't quietly swap in its own key.**
+**Courier delivers encrypted invoices and documents between QoreChain addresses, and ties each one to its payment and its delivery receipt on chain. It checks the recipient's key bundle on chain before encrypting, so a relay can't quietly swap in its own key.**
 
-Every recipient key bundle is bound on chain by an ML-DSA-87 signature, and every message is sealed client-side with ML-KEM-1024 and a double ratchet. A paid invoice leaves only its ciphertext hash on chain (`MemoPay`), and a recipient's optional ML-DSA-87 delivery receipt is checked on chain by `DeliveryReceipts`.
+Courier delivers the invoice; the payment goes through `MemoPay`, which stores only `keccak256(ciphertext)`; the recipient's ML-DSA-87 delivery receipt is checked on chain by `DeliveryReceipts`. Two other Haven apps use what Courier delivers: Steward's `CourierInboxAdapter` reads and re-verifies the vendor-signed invoices a Courier device opened, and in the recorded Haven Escrow carry the escrow released 100,000 fUSD base units after the client's Courier receipt was recorded on `DeliveryReceipts` (the escrow page read `receipt()`; the escrow contract itself does not call it). Every recipient key bundle is bound on chain by an ML-DSA-87 signature, and every message and file is sealed client-side with ML-KEM-1024 and a double ratchet. Messages work the same way; invoices and documents are what Courier is for.
 
 Tola sends a confidential invoice (`INV-0007.json`, 84 bytes) to a vendor through an untrusted relay. When the relay tries to swap in a different prekey bundle, Courier catches the mismatch and refuses before sealing a single byte — and when the invoice is paid, only a 32-byte ciphertext hash touches the chain, never the text.
 
-[Live demo](https://courier-fawn-psi.vercel.app) · [Judge in 5 minutes](#judge-it-in-5-minutes) · [Run locally](#run-locally) · [What works today](#what-works-today)
+[Try it: catch a lying relay](https://courier-fawn-psi.vercel.app/app/try) · [Live demo](https://courier-fawn-psi.vercel.app) · [Judge in 5 minutes](#judge-it-in-5-minutes) · [Run locally](#run-locally) · [What works today](#what-works-today)
 
 <p align="center">
   <a href="https://courier-fawn-psi.vercel.app"><img src="docs/screen-home.png" width="880" alt="Courier home screen showing 'Only the current device can read it' and live testnet receipt proof with 0 bytes of plaintext on chain." /></a>
@@ -23,7 +23,7 @@ Why not an existing messenger or plain encrypted chat? Harvest-now, decrypt-late
 
 What is the biggest risk? Published prekey bundles expire after at most 7 days on chain and must be renewed (`npm run renew`), the relay can still drop or withhold traffic (its state now survives a restart, but availability is not protected), and one-way messages do not rekey until the peer replies (see [Known limits](#known-limits)).
 
-How can a judge try it right now? Open [courier-fawn-psi.vercel.app/app/receipt](https://courier-fawn-psi.vercel.app/app/receipt) and click Verify all to check the vendor bundle, Carol's bundle, and the recorded delivery receipt live against QoreChain Diana with no wallet, or clone the repo and run `npm test` and `npm run evidence` (30 checks, 0 keys).
+How can a judge try it right now? Open [courier-fawn-psi.vercel.app/app/try](https://courier-fawn-psi.vercel.app/app/try): a client and a vendor in one page send a message and an invoice file through an in-page relay, running Courier's real handshake and ratchet in the browser against the demo vendor's bundle hash on chain. Switch the relay to lying and the client refuses with `BUNDLE_HASH` before sealing anything. The two identities on that page are public demo keys (committed on purpose; they hold nothing). Or open [courier-fawn-psi.vercel.app/app/receipt](https://courier-fawn-psi.vercel.app/app/receipt) and click Verify all to check the vendor bundle, Carol's bundle, and the recorded delivery receipt live against QoreChain Diana with no wallet, or clone the repo and run `npm test` and `npm run evidence` (30 checks, 0 keys).
 
 ---
 
@@ -37,15 +37,16 @@ How can a judge try it right now? Open [courier-fawn-psi.vercel.app/app/receipt]
 6. [Rubric and track mapping](#rubric-and-track-mapping)
 7. [What works today](#what-works-today)
 8. [Known limits](#known-limits)
-9. [Run locally](#run-locally)
-10. [Repository map](#repository-map)
-11. [Roadmap](#roadmap)
-12. [Built during the hackathon](#built-during-the-hackathon)
-13. [AI disclosure](#ai-disclosure)
-14. [Evidence: testnet addresses](#evidence-testnet-addresses)
-15. [Evidence: directory, exchange, MemoPay, group, and Escrow carry](#evidence-directory-exchange-memopay-group-and-escrow-carry)
-16. [Evidence: bundle renewal calendar through judging](#evidence-bundle-renewal-calendar-through-judging)
-17. [Evidence: design decisions and cost breakdown](#evidence-design-decisions-and-cost-breakdown)
+9. [The /app/try demo (public demo keys)](#the-apptry-demo-public-demo-keys)
+10. [Run locally](#run-locally)
+11. [Repository map](#repository-map)
+12. [Roadmap](#roadmap)
+13. [Built during the hackathon](#built-during-the-hackathon)
+14. [AI disclosure](#ai-disclosure)
+15. [Evidence: testnet addresses](#evidence-testnet-addresses)
+16. [Evidence: directory, exchange, MemoPay, group, and Escrow carry](#evidence-directory-exchange-memopay-group-and-escrow-carry)
+17. [Evidence: bundle renewal calendar through judging](#evidence-bundle-renewal-calendar-through-judging)
+18. [Evidence: design decisions and cost breakdown](#evidence-design-decisions-and-cost-breakdown)
 
 ---
 
@@ -90,8 +91,9 @@ Encrypting directly to a long-term identity KEM key makes implementation trivial
 
 Everything below runs on QoreChain Diana (`qorechain-diana`, EVM chain ID `9800`) using test fUSD. If the live testnet RPC is unreachable, the replay still loads and displays `"Could not reach the testnet"` rather than a false pass (see [Known limits](#known-limits)).
 
-1. Browser replay and live signature verification (no wallet, no setup): open [courier-fawn-psi.vercel.app/app/receipt](https://courier-fawn-psi.vercel.app/app/receipt) and click Verify all to check the vendor bundle publish, Carol's bundle publish, and delivery receipt `0x3dfdb6bd…566a89` directly against QoreChain Diana without calling the relay or holding a key.
-2. One-command hash verification from a clone (no keys):
+1. Browser lying-relay demo (no wallet, no setup): open [courier-fawn-psi.vercel.app/app/try](https://courier-fawn-psi.vercel.app/app/try), click Send message and invoice, then switch the relay to Lying and send again. The page reads `PrekeyDirectory.current(courier-demo-vendor)` and the demo client's ML-DSA-87 key from QoreChain Diana; everything else runs in the page. If the demo bundle has expired, the page says so and the client refuses with `BUNDLE_EXPIRED`. See [The /app/try demo](#the-apptry-demo-public-demo-keys).
+2. Browser replay and live signature verification (no wallet, no setup): open [courier-fawn-psi.vercel.app/app/receipt](https://courier-fawn-psi.vercel.app/app/receipt) and click Verify all to check the vendor bundle publish, Carol's bundle publish, and delivery receipt `0x3dfdb6bd…566a89` directly against QoreChain Diana without calling the relay or holding a key.
+3. One-command hash verification from a clone (no keys):
    ```bash
    git clone --recurse-submodules https://github.com/datharnu/courier
    cd courier
@@ -99,12 +101,12 @@ Everything below runs on QoreChain Diana (`qorechain-diana`, EVM chain ID `9800`
    npm run evidence
    ```
    On 21 November 2026 `npm run evidence` printed 30 passed, 0 failed.
-3. Offline contract, protocol, lying-relay, and CBOM tests (no chain, no keys):
+4. Offline contract, protocol, lying-relay, and CBOM tests (no chain, no keys):
    ```bash
    npm test          # runs npm run test:ts (lying relay, ratchet, groups) + forge test
    npm run cbom:check
    ```
-4. Local replay UI and local relay:
+5. Local replay UI and local relay:
    ```bash
    npm run web       # replays the recorded group run (sends nothing)
    npm run relay     # local relay on 127.0.0.1:8787 reading qorechain-diana; state saved to .relay-state.json
@@ -147,11 +149,12 @@ Built for Build Before Q-Day (`https://build.qorechain.io/`), category bounty En
 
 - Deployed `PrekeyDirectory`, `MemoPay`, and `DeliveryReceipts` on `qorechain-diana` with two live bundles (vendor and Carol), and completed the live exchange, `MemoPay` payment, three-member group run, and Haven Escrow file carry ([full hashes and details](#evidence-directory-exchange-memopay-group-and-escrow-carry)).
 - Live browser verification at `https://courier-fawn-psi.vercel.app/app/receipt` passed on 21 November 2026 at 390px and 1440px (0 horizontal overflow, 0 RPC errors).
+- `/app/try` against the live chain, no mocks (`COURIER_LIVE=1 npx playwright test e2e/try-live.spec.ts` in `apps/web`, on a local build, 23 November 2026): the page read `current(courier-demo-vendor)` = `0x0f13517a19a3a1df5a333553b0bff2384cb577cd076deac06a988a6fee4a4175` and the demo client's registered ML-DSA-87 key; the honest run delivered the message, `INV-0007.json`, and the vendor's reply with a 1,568-byte ML-KEM ratchet ciphertext; the lying relay was refused with `BUNDLE_HASH` (0 bytes sealed); a flipped byte was refused with `AEAD`. The deployed site needs a redeploy to serve `/app/try`.
 - CLI checks passed on 21 November 2026: `npm run evidence` (30 passed, 0 failed), `npm run cbom:check`, and `npm test` (Foundry + `node:test` lying-relay suite).
 
 ### Built, not observed
 
-- Browser-side bundle publishing for guest judges: planned design, not built yet; `/app/receipt` is read-only replay and live verification.
+- Browser-side bundle publishing for guest judges: not built; `/app/try` uses two fixed public demo identities instead.
 
 ### Deliberately absent
 
@@ -165,13 +168,49 @@ Built for Build Before Q-Day (`https://build.qorechain.io/`), category bounty En
 
 ## Known limits
 
-- 7-day bundle expiry: `PrekeyDirectory` caps bundle lifetime at 7 days. Vendor's bundle expires 26 November 2026 at 20:11 UTC and Carol's expires 27 November 2026 at 11:45 UTC. Recorded hashes and signatures stay verifiable forever, while live `current()` requires renewal (`npm run renew -- --send`, before expiry) on the [renewal calendar](#evidence-bundle-renewal-calendar-through-judging).
+- 7-day bundle expiry: `PrekeyDirectory` caps bundle lifetime at 7 days. Vendor's bundle expires 26 November 2026 at 20:11 UTC, Carol's 27 November 2026 at 11:45 UTC, and the `/app/try` demo vendor's 30 November 2026 at 12:22 UTC (after that the page says the bundle expired and the client refuses with `BUNDLE_EXPIRED`). Recorded hashes and signatures stay verifiable forever, while live `current()` requires renewal (`npm run renew -- --send`, before expiry) on the [renewal calendar](#evidence-bundle-renewal-calendar-through-judging).
 - Relay storage and availability: `npm run relay` saves bundles, handed-out one-time entries, cards, inboxes, and files to `.relay-state.json` (set `RELAY_STATE_FILE` to move it, or `RELAY_STATE_FILE=memory` for the old in-memory behaviour), writing a temporary file and renaming it, so a restart keeps undelivered messages. Sign-in tokens are not saved, so clients sign in again. The whole file is rewritten on every change (fine for a demo, not for volume), inbox items are never pruned (each inbox stops at 1,000 items), and availability is still not protected: a relay can drop, withhold, or delete traffic.
 - One-way talking without replies: no ML-KEM ratchet step completes until the peer replies; until then, messages rely on the symmetric chain.
 - Last-resort prekey exposure: if all 20 one-time prekeys are exhausted, handshakes fall back to the last-resort prekey until the next bundle rotation.
 - No skipped-message recovery: counters must match strictly; one lost message requires restarting that direction.
 - Forwarded invoices: a vendor's signature binds the payee, not the messenger sender, so a forwarded invoice still verifies (payout stays locked to the signed payee).
 - Safety numbers: SHA-256 based; not compatible with Signal's SHA-512 safety numbers.
+
+---
+
+## The /app/try demo (public demo keys)
+
+`/app/try` puts a client and a vendor in one browser page with a relay between them that also runs in the page, so it can be told to lie. It runs the real protocol files (`bytes`, `crypto`, `bundle`, `handshake`, `session`, `file`); `npm run web:sync` copies them from `src/ts` into `apps/web/lib/protocol`, dropping only the `.js` suffix on relative imports (Next's Turbopack does not map `./x.js` to `x.ts`), and `test/ts/web-protocol.test.ts` fails CI if a copy drifts. They import only pure-JavaScript packages (`@qorechain/pqc`, `qoreseal`, `qoresign`, `@noble/*`, viem), so no Node polyfill is needed. `chain.ts`, `relay.ts`, `relay-store.ts` (`node:fs`), and `client.ts` are not used by the page.
+
+- Chain reads: `PrekeyDirectory.current(courier-demo-vendor)` and `pqcKeyStatus(courier-demo-client)` over the public EVM RPC, as `/app/receipt` does. The vendor checks the client's first-message signature against that on-chain key.
+- Honest relay: handshake (3 X25519 + ML-KEM-1024), first message, `INV-0007.json` sealed with its own file key, the key in ratchet message 1, then the vendor's reply carrying a 1,568-byte ML-KEM-1024 ciphertext (the KEM step is set to every 2 messages here; the default is 20).
+- Lying relay: hands over a bundle it generated itself; the client refuses with `BUNDLE_HASH` and shows both hashes and 0 bytes sealed. Tamper toggle: one flipped byte in the file-key message is refused with `AEAD` by the vendor.
+- Demo keys are public on purpose. `courier-demo-vendor` and `courier-demo-client` have their mnemonics and secret keys committed in `apps/web/fixtures/demo/identities.json`. They hold nothing; anyone can sign as them. A real Courier device never ships its secret keys.
+- One-time prekeys: every run uses the vendor's last-resort ML-KEM prekey. The keys are public and each page load starts a fresh vendor, so a one-time prekey could not stay one-time; the last-resort prekey is the one the protocol already reuses, and each run still has a fresh ephemeral X25519 key and a fresh encapsulation. One-time prekeys (erased on open, reuse refused) are covered by the CLI tests and the recorded exchange.
+- Fixed demo prekeys: renewal republishes the same demo prekeys with a new expiry, so the page needs no redeploy after `npm run renew -- --send`. Because the keys are public, anyone could publish a different hash for the demo vendor; the page then says the chain holds a bundle that is not the demo vendor's, and a renewal restores it.
+- Not re-read in the browser: the vendor's registry ML-KEM key and X25519 card key come from the demo file, because the chain's REST API does not allow browser reads (no CORS); `npm run demo:identities` checks the registry key before publishing.
+
+How the identities were set up on testnet (run on 23 November 2026; report in `deployments/demo-identities.json`):
+
+```bash
+npm run demo:identities                 # plan: reads balances and registrations, prints each step and its cost, sends nothing
+npm run demo:identities -- --broadcast  # funds both from spike, registers ML-DSA-87 (proof of possession) for both,
+                                        # registers the vendor's ML-KEM-1024 key, publishes the vendor's bundle hash
+npm run renew                           # from then on the dry run lists courier-demo-vendor with the other bundles
+```
+
+The plan printed six steps (about 2.76 QOR from `spike`: 0.4 and 2.0 QOR moved to the client and vendor plus two 0.18 QOR fees; then the demo accounts paid their own fees), and `--broadcast` ran all six:
+
+| Step | Hash |
+| --- | --- |
+| Fund `courier-demo-client` | `A92E99F3843BC5DF61E74057A1778AA1CA674BE3BC072C6EE2AD20EAF4953CF0` |
+| Register the client's ML-DSA-87 key (proof of possession) | `5AAF1F86A33B6F4C136B43A5560AA502635CA99C341D5B56BA313AC17E6356BD` |
+| Fund `courier-demo-vendor` | `7B2BE7A6C5685DBF882E18C2C89754BA545D63B2F943E701AEC3B76D1605D955` |
+| Register the vendor's ML-DSA-87 key (proof of possession) | `9D4C276F2CFBE056359FDAF679859313498FE0D99503013B0645A3929CBE207E` |
+| Register the vendor's ML-KEM-1024 identity key | `9D191E8D705D00650A733B4E82657472B25516694A90A5EDEA50F29CB258A58E` |
+| Publish the vendor's bundle `0x0f13517a19a3a1df5a333553b0bff2384cb577cd076deac06a988a6fee4a4175` (280,781 gas; a flipped-byte `eth_call` reverted `SignatureInvalid` first) | `0x823fea9cbc7db2deac4fbbad47871f10766a378d1447f700aeaa8c21d6d7b08d` |
+
+The demo bundle's expiry is `1796041377` (30 November 2026, 12:22 UTC). It must be renewed before then: `npm run renew` lists `courier-demo-vendor` with the other bundles and it falls inside the 48-hour window from 28 November 12:22 UTC, so `npm run renew -- --send` on 30 November before 12:22 UTC (or any time from 28 November) renews it with the same public prekeys and a new expiry; see the [renewal calendar](#evidence-bundle-renewal-calendar-through-judging). No redeploy is needed after a renewal.
 
 ---
 
@@ -187,7 +226,7 @@ npm test              # TypeScript protocol + lying-relay tests, then forge test
 npm run cbom:check    # verifies no ecrecover and only PQC precompiles
 npm run evidence      # re-checks all 30 recorded testnet hashes (no keys)
 npm run relay         # relay on 127.0.0.1:8787, state in .relay-state.json
-npm run renew         # dry run: which project bundles expire within 48 h (sends nothing)
+npm run renew         # dry run: which project bundles (incl. the /app/try demo vendor) expire within 48 h (sends nothing)
 npm run web           # local replay UI (sends nothing)
 ```
 
@@ -205,7 +244,9 @@ Live scripts (`npm run live`, `npm run deploy:directory`, `npm run deploy:memopa
 | `src/BundleSpike.sol` | Earlier signed-bundle spike contract |
 | `src/ts/` | X25519 + ML-KEM-1024 handshake, double ratchet, client, groups, invoices, safety numbers |
 | `scripts/` | Local relay (file-backed), live exchange, live group, deploy, `renew-bundles.ts`, `evidence.ts` (30 checks), `cbom.ts` |
-| `apps/web/` | Next.js replay and live browser receipt/bundle verifier (`https://courier-fawn-psi.vercel.app`) |
+| `apps/web/` | Next.js replay, live browser receipt/bundle verifier, and the `/app/try` lying-relay demo (`https://courier-fawn-psi.vercel.app`) |
+| `apps/web/lib/protocol/` | Copies of the six browser-safe `src/ts` protocol files (`npm run web:sync`, checked in CI) |
+| `apps/web/fixtures/demo/identities.json` | The two public demo identities for `/app/try` (secret keys public on purpose) |
 | `test/` & `test/ts/` | Foundry unit + invariant tests (`PrekeyDirectory`, `MemoPay`, `DeliveryReceipts`) and `node:test` protocol, ratchet-refusal, lying-relay, and relay-persistence tests |
 | `deployments/` | Recorded testnet JSON reports and bundle snapshots |
 | `vectors/protocol.json` | Pinned protocol byte vectors |
@@ -215,7 +256,7 @@ Live scripts (`npm run live`, `npm run deploy:directory`, `npm run deploy:memopa
 ## Roadmap
 
 1. Before 2 December 2026: record and publish the ≤3-minute demo film (`docs/DEMO.md`) and renew vendor/Carol bundles on schedule through judging.
-2. Browser guest flow: let visitors publish ephemeral browser bundles and run live end-to-end exchanges in the browser.
+2. Browser guest flow: `/app/try` runs the protocol in the browser with two public demo identities; next, let visitors publish their own ephemeral browser bundles.
 3. Durable relay: replace the single local state file with hosted, replicated queues.
 4. External audit: audit `PrekeyDirectory`, `MemoPay`, `DeliveryReceipts`, and the TypeScript ratchet before mainnet use.
 
@@ -231,7 +272,7 @@ Credits: `@qorechain/sdk` 0.14.0, `@qorechain/pqc` 0.2.3, `@qorechain/qoreseal` 
 
 ## AI disclosure
 
-Written across Cursor agent sessions (Claude, including Claude Opus 5.5 on 20 Nov 2026) under human direction, with the human approving every network transaction, commit, and push; later README restructuring used Antigravity. Human decisions included fail-closed rules, strict counter matching (no skipped-message keys), keeping `MemoPay` separate from Steward's `PayGate`, using `haven-pq-kit` v0.1.0, and adding `courier-carol` for the group run. Bugs caught and fixed during development included signing the `spent` prekey list on republish, adding relay instance IDs for restart detection, and routing the swapped-key test through the real REST proxy.
+Written across Cursor agent sessions (Claude, including Claude Opus 5.5 on 20 Nov 2026) under human direction, with the human approving every network transaction, commit, and push; later README restructuring used Antigravity. The `/app/try` page, the demo identity and publish scripts, and the copy repositioning were written with Claude Opus 5.5 on 23 November 2026 under the same rule: no transaction was sent. Human decisions included fail-closed rules, strict counter matching (no skipped-message keys), keeping `MemoPay` separate from Steward's `PayGate`, using `haven-pq-kit` v0.1.0, and adding `courier-carol` for the group run. Bugs caught and fixed during development included signing the `spent` prekey list on republish, adding relay instance IDs for restart detection, and routing the swapped-key test through the real REST proxy.
 
 ---
 
@@ -248,9 +289,12 @@ Network: `qorechain-diana` (EVM chain ID `9800`).
 | `spike` (deployer & group admin) | `qor143f0ghn8slqguwez73087dvq8lqnuuukqdu9fl` / `0xaC52f45E6787c08E3B22f45e7f35803Fc13e7396` |
 | `steward-vendor` | `qor17zwvy05e9fzerfzksdkhygm92wvapwusvh4zfv` / `0xf09cc23e992A4591A456836D7223655399D0BB90` |
 | `courier-carol` (removed in group run) | `qor1tacy6fv8x0jveznhdmyrqc2yep83awk07v3tf4` / `0x5f704d258733e4cc8a776ec8306144c84f1ebacf` |
+| `courier-demo-vendor` (`/app/try`, public demo keys) | `qor1ee5ypk25qvppjs7hqk7fcvf354rkcc9sqcak0u` / `0xce6840d95403021943d705bc9c3131a5476c60b0` |
+| `courier-demo-client` (`/app/try`, public demo keys) | `qor1t5parjalqguchl9aptfw4wd5wwn9uhahusfkdu` / `0x5d03d1cbbf02398bfcbd0ad2eab9b473a65e5fb7` |
 
 - Vendor bundle hash: `0x9306826eb46977b32639a004ad992c868c5614d703fbb9a8e8cc08309b13e79f` (expiry `1795723898`, 26 Nov 2026 20:11 UTC).
 - Carol bundle hash: `0x157c35bd5c1ffd5eb7606d33bc93183096184fc438155048e5d5bd5f07dbf6f0` (expiry `1795779952`, 27 Nov 2026 11:45 UTC).
+- Demo vendor bundle hash (`/app/try`): `0x0f13517a19a3a1df5a333553b0bff2384cb577cd076deac06a988a6fee4a4175` (expiry `1796041377`, 30 Nov 2026 12:22 UTC), published in `0x823fea9cbc7db2deac4fbbad47871f10766a378d1447f700aeaa8c21d6d7b08d`.
 
 ---
 
@@ -279,7 +323,7 @@ Live exchange (`deployments/live-exchange.json`, 19 Nov 2026 20:47 UTC): convers
 
 `PrekeyDirectory` enforces a 7-day maximum bundle lifetime, and accepts a new publish at any time, so project bundles are renewed before they expire rather than after.
 
-`npm run renew` (`scripts/renew-bundles.ts`) reads `PrekeyDirectory.current(owner)` for the vendor and Carol and their uqor balances, using read-only calls and no keys, and prints which bundles expire within the window (default 48 hours, `--within <hours>`). It sends nothing unless given `--send`:
+`npm run renew` (`scripts/renew-bundles.ts`) reads `PrekeyDirectory.current(owner)` for the vendor, Carol, and the `/app/try` demo vendor (`courier-demo-vendor`, keys in `apps/web/fixtures/demo/identities.json`) and their uqor balances, using read-only calls and no keys, and prints which bundles expire within the window (default 48 hours, `--within <hours>`). It sends nothing unless given `--send`:
 
 ```bash
 npm run renew                  # dry run: shows what is due, sends nothing
@@ -294,10 +338,10 @@ Planned schedule (not yet run). Each run renews to 7 days ahead, so the next run
 
 | Date (UTC) | Command | Expected result |
 | --- | --- | --- |
-| 25 Nov 2026, after 11:45 | `npm run renew -- --send` | Vendor and Carol both inside 48 hours; both renewed to about 2 Dec |
-| 30 Nov 2026 | `npm run renew -- --send` | Both renewed to about 7 Dec |
-| 5 Dec 2026 | `npm run renew -- --send` | Both renewed to about 12 Dec |
-| 10 Dec 2026 | `npm run renew -- --send` | Both renewed to about 17 Dec |
+| 25 Nov 2026, after 11:45 | `npm run renew -- --send` | Vendor and Carol both inside 48 hours; both renewed to about 2 Dec. Demo vendor not yet due |
+| 30 Nov 2026, before 12:22 | `npm run renew -- --send` | Vendor, Carol, and the demo vendor (expires 30 Nov 12:22) renewed to about 7 Dec |
+| 5 Dec 2026 | `npm run renew -- --send` | All three renewed to about 12 Dec |
+| 10 Dec 2026 | `npm run renew -- --send` | All three renewed to about 17 Dec |
 
 ---
 

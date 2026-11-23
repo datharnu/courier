@@ -198,6 +198,12 @@ export default function Home() {
               >
                 Inspect on-chain ledger
               </Link>
+              <Link
+                href="/app/try"
+                className="pointer-events-auto inline-flex min-h-12 items-center rounded-xl border border-line-strong bg-surface/90 px-5 text-[15px] font-medium text-ink backdrop-blur-sm hover:border-brand/50"
+              >
+                Try it: catch a lying relay
+              </Link>
             </div>
           </div>
         </section>

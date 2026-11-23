@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { MessageSquare, ReceiptText, ShieldCheck, Users, Waypoints } from "lucide-react";
+import { MessageSquare, ReceiptText, ShieldAlert, ShieldCheck, Users, Waypoints } from "lucide-react";
 import { CourierMark } from "./brand-mark";
 import { ThemeToggle } from "./theme-toggle";
 
 const SECONDARY_LINKS = [
+  { href: "/app/try", label: "Try it: lying relay", shortLabel: "Try it", icon: ShieldAlert },
   { href: "/app/receipt", label: "Receipt", shortLabel: "Receipt", icon: ShieldCheck },
   { href: "/app/how", label: "How it works", shortLabel: "How", icon: Waypoints },
 ];
@@ -175,7 +176,7 @@ export function AppShell({
       </div>
 
       <nav aria-label="Mobile navigation" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-canvas/95 backdrop-blur md:hidden">
-        <div className="grid grid-cols-3">
+        <div className="grid grid-cols-4">
           <Link
             href="/app"
             aria-current={pathname === "/app" ? "page" : undefined}

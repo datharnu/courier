@@ -69,13 +69,16 @@ export async function broadcast(
   }
 }
 
-/** Opens a scoped EVM window, runs `body`, and always closes it. The value cap also pays gas. */
+/**
+ * Opens a scoped EVM window, runs `body`, and always closes it. The value cap also pays gas.
+ * `who` is an account name in ~/.haven, or an account already derived (the public demo identities).
+ */
 export async function withEvmWindow<T>(
-  name: string,
+  who: string | UnifiedAccount,
   spec: { txs: number; maxValueUqor: string; targets?: string[]; blocks?: number },
   body: (account: UnifiedAccount) => Promise<T>,
 ): Promise<{ result: T; openHash: string; closeHash: string }> {
-  const account = await loadAccount(name);
+  const account = typeof who === "string" ? await loadAccount(who) : who;
   const openHash = await broadcast(account, [
     openEvmWindowMsg({
       sender: account.cosmos,
