@@ -9,7 +9,7 @@ Tola sends a confidential invoice (`INV-0007.json`, 84 bytes) to a vendor throug
 [Demo video (2:32)](https://drive.google.com/file/d/1P5WucUYNApsJwSpqOjGl3RPNHud-PMBK/view) · [Try it: catch a lying relay](https://courier-fawn-psi.vercel.app/app/try) · [Live demo](https://courier-fawn-psi.vercel.app) · [Judge in 5 minutes](#judge-it-in-5-minutes) · [Run locally](#run-locally) · [What works today](#what-works-today)
 
 <p align="center">
-  <a href="https://drive.google.com/file/d/1P5WucUYNApsJwSpqOjGl3RPNHud-PMBK/view"><img src="docs/screen-home.png" width="880" alt="Watch the Courier demo" /></a>
+  <a href="https://drive.google.com/file/d/1P5WucUYNApsJwSpqOjGl3RPNHud-PMBK/view"><img src="docs/video-cover.jpg" width="880" alt="Watch the Courier demo" /></a>
   <br />
   <sub><a href="https://drive.google.com/file/d/1P5WucUYNApsJwSpqOjGl3RPNHud-PMBK/view">▶ Watch demo (2:32)</a></sub>
 </p>
