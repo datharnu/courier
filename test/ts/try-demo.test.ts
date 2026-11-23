@@ -2,8 +2,17 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { bytesOf, demoBundleHash, parseDemoFixture } from "../../apps/web/lib/try/demo-keys.js";
-import { ZERO_HASH, bundleState, runDemo, type ChainView, type DemoInput } from "../../apps/web/lib/try/flow.js";
+import * as demoKeysModule from "../../apps/web/lib/try/demo-keys.js";
+import * as flowModule from "../../apps/web/lib/try/flow.js";
+import type { ChainView, DemoInput } from "../../apps/web/lib/try/flow.js";
+
+// apps/web has no "type": "module", so Node loads these files as CommonJS. Node 22 does not always
+// detect their named exports from an ES import; the CommonJS `default` (module.exports) always has them.
+function cjs<T extends object>(ns: T): T {
+  return ((ns as { default?: T }).default ?? ns) as T;
+}
+const { bytesOf, demoBundleHash, parseDemoFixture } = cjs(demoKeysModule);
+const { ZERO_HASH, bundleState, runDemo } = cjs(flowModule);
 
 /** The committed public demo identities. The chain read is mocked: no network. */
 const fixture = parseDemoFixture(JSON.parse(readFileSync("apps/web/fixtures/demo/identities.json", "utf8")));
