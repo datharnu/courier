@@ -1,12 +1,12 @@
 # Courier
 
-**Courier encrypts messages, files, and invoices for QoreChain recipients. It checks the recipient's key bundle on chain before encrypting, so a relay can't quietly swap in its own key.**
+**Courier sends encrypted invoices, files, and messages between QoreChain addresses, and can tie each one to an on-chain payment or signed delivery receipt. It checks the recipient's key bundle on chain before encrypting, so a relay can't quietly swap in its own key.**
 
-Every recipient key bundle is bound on chain by an ML-DSA-87 signature, and every message is sealed client-side with ML-KEM-1024 and a double ratchet.
+Every recipient key bundle is bound on chain by an ML-DSA-87 signature, and every message is sealed client-side with ML-KEM-1024 and a double ratchet. A paid invoice leaves only its ciphertext hash on chain (`MemoPay`), and a recipient's optional ML-DSA-87 delivery receipt is checked on chain by `DeliveryReceipts`.
 
 Tola sends a confidential invoice (`INV-0007.json`, 84 bytes) to a vendor through an untrusted relay. When the relay tries to swap in a different prekey bundle, Courier catches the mismatch and refuses before sealing a single byte — and when the invoice is paid, only a 32-byte ciphertext hash touches the chain, never the text.
 
-[Live demo](https://courier-fawn-psi.vercel.app) · [Watch the film (up to 3 min — not recorded yet)](#built-during-the-hackathon) · [Judge in 5 minutes](#judge-it-in-5-minutes) · [Run locally](#run-locally) · [What works today](#what-works-today)
+[Live demo](https://courier-fawn-psi.vercel.app) · [Judge in 5 minutes](#judge-it-in-5-minutes) · [Run locally](#run-locally) · [What works today](#what-works-today)
 
 <p align="center">
   <a href="https://courier-fawn-psi.vercel.app"><img src="docs/screen-home.png" width="880" alt="Courier home screen showing 'Only the current device can read it' and live testnet receipt proof with 0 bytes of plaintext on chain." /></a>
@@ -19,9 +19,9 @@ Tola sends a confidential invoice (`INV-0007.json`, 84 bytes) to a vendor throug
 | One-time handshake, reply, and 84-byte invoice file | Delivered and verified end to end; one-time prekey secrets erased after use |
 | Three-person group message, file, receipt, and member removal | Removed member's next post refused (`refused GROUP`) by all remaining devices |
 
-Why not an existing messenger or plain encrypted chat? Standard encrypted messengers bind keys with classical elliptic-curve signatures vulnerable to harvest-now, decrypt-later quantum attacks, or rely on a central key server. Courier binds every prekey bundle on QoreChain with ML-DSA-87, encapsulates handshakes with ML-KEM-1024, and never trusts the relay for a key.
+Why not an existing messenger or plain encrypted chat? Harvest-now, decrypt-later is not the difference: Signal already adds ML-KEM to its handshake (PQXDH) and has added a post-quantum ratchet. The difference is who vouches for the keys. Signal-style messengers authenticate identity keys with classical signatures and hand out keys from the operator's central key server, which users trust unless they compare safety numbers. Courier binds each recipient's prekey bundle to their QoreChain address on chain with ML-DSA-87, so there is no key server to trust and the relay cannot swap a key without being refused. Messages, files, and invoices also tie into on-chain delivery receipts and payments (`MemoPay`, Haven Escrow), which a general chat app is not built for.
 
-What is the biggest risk? The local relay keeps state in memory, published prekey bundles expire after at most 7 days on chain, and one-way messages do not rekey until the peer replies (see [Known limits](#known-limits)).
+What is the biggest risk? Published prekey bundles expire after at most 7 days on chain and must be renewed (`npm run renew`), the relay can still drop or withhold traffic (its state now survives a restart, but availability is not protected), and one-way messages do not rekey until the peer replies (see [Known limits](#known-limits)).
 
 How can a judge try it right now? Open [courier-fawn-psi.vercel.app/app/receipt](https://courier-fawn-psi.vercel.app/app/receipt) and click Verify all to check the vendor bundle, Carol's bundle, and the recorded delivery receipt live against QoreChain Diana with no wallet, or clone the repo and run `npm test` and `npm run evidence` (30 checks, 0 keys).
 
@@ -64,7 +64,7 @@ flowchart LR
     B[Recipient device] -->|ML-DSA-87 signed hash| D[PrekeyDirectory on QoreChain]
     A[Sender device] -->|reads current hash| D
     A -->|fetches bundle, checks hash| R[Untrusted Relay]
-    A -->|X25519 x4 + ML-KEM-1024 + AES-GCM| R
+    A -->|X25519 x4 + ML-KEM-1024 + XChaCha20-Poly1305| R
     R -->|ciphertext only| B
     B -->|ML-DSA-87 receipt| DR[DeliveryReceipts on QoreChain]
     A -->|fUSD + keccak256 ciphertext| MP[MemoPay on QoreChain]
@@ -104,10 +104,10 @@ Everything below runs on QoreChain Diana (`qorechain-diana`, EVM chain ID `9800`
    npm test          # runs npm run test:ts (lying relay, ratchet, groups) + forge test
    npm run cbom:check
    ```
-4. Local replay UI and in-memory relay:
+4. Local replay UI and local relay:
    ```bash
    npm run web       # replays the recorded group run (sends nothing)
-   npm run relay     # local relay on 127.0.0.1:8787 reading qorechain-diana
+   npm run relay     # local relay on 127.0.0.1:8787 reading qorechain-diana; state saved to .relay-state.json
    ```
 
 ---
@@ -121,7 +121,8 @@ Everything below runs on QoreChain Diana (`qorechain-diana`, EVM chain ID `9800`
 - Removed group member posts a new message: every remaining device refuses the post with `refused GROUP`.
 - Stranger posts to a user's inbox: refused unless signed or valid under the conversation's AEAD; reading an inbox requires SIWQ + ML-DSA-87 sign-in.
 - Observer inspects `MemoPay` calldata for invoice details: calldata is 132 bytes containing only `keccak256(ciphertext)`, never plaintext or plaintext hash.
-- Restarted relay tries to hand out an already-used one-time prekey: owner signs the `spent` list on re-publish, and each relay boot uses a fresh instance ID.
+- Restarted relay tries to hand out an already-used one-time prekey: `npm run relay` keeps handed-out entries in its state file across restarts; a relay that lost its state gets a fresh instance ID, and the owner signs the `spent` list on re-publish.
+- Relay drops, reorders, duplicates, or replays a ratchet message, or flips a byte of its ciphertext, nonce, or header: refused with `COUNTER` or `AEAD`, and the session does not move, so the genuine message still opens (`test/ts/ratchet-refusals.test.ts`).
 
 ---
 
@@ -146,7 +147,7 @@ Built for Build Before Q-Day (`https://build.qorechain.io/`), category bounty En
 
 - Deployed `PrekeyDirectory`, `MemoPay`, and `DeliveryReceipts` on `qorechain-diana` with two live bundles (vendor and Carol), and completed the live exchange, `MemoPay` payment, three-member group run, and Haven Escrow file carry ([full hashes and details](#evidence-directory-exchange-memopay-group-and-escrow-carry)).
 - Live browser verification at `https://courier-fawn-psi.vercel.app/app/receipt` passed on 21 November 2026 at 390px and 1440px (0 horizontal overflow, 0 RPC errors).
-- CLI checks passed on 21 November 2026: `npm run evidence` (30 passed, 0 failed), `npm run cbom:check`, and `npm test` (Foundry + Vitest lying-relay suite).
+- CLI checks passed on 21 November 2026: `npm run evidence` (30 passed, 0 failed), `npm run cbom:check`, and `npm test` (Foundry + `node:test` lying-relay suite).
 
 ### Built, not observed
 
@@ -154,7 +155,7 @@ Built for Build Before Q-Day (`https://build.qorechain.io/`), category bounty En
 
 ### Deliberately absent
 
-- Durable hosted relay: current relay is in-memory on `127.0.0.1` for local demos.
+- Durable hosted relay: the relay runs on `127.0.0.1` for local demos; `npm run relay` keeps its state in one local JSON file, not a hosted, replicated queue.
 - Skipped-message key storage: dropped messages stall that direction rather than caching old keys.
 - Retroactive history erasure on group removal: removed members retain messages and files they already decrypted.
 - QCAI dashboard audit: not run on Courier contracts.
@@ -164,8 +165,8 @@ Built for Build Before Q-Day (`https://build.qorechain.io/`), category bounty En
 
 ## Known limits
 
-- 7-day bundle expiry: `PrekeyDirectory` caps bundle lifetime at 7 days. Vendor's bundle expires 26 November 2026 at 20:11 UTC and Carol's expires 27 November 2026 at 11:45 UTC. Recorded hashes and signatures stay verifiable forever, while live `current()` requires renewal on the [renewal calendar](#evidence-bundle-renewal-calendar-through-judging).
-- In-memory relay: restarting `npm run relay` loses undelivered inboxes and files; availability is not protected against a relay that drops traffic.
+- 7-day bundle expiry: `PrekeyDirectory` caps bundle lifetime at 7 days. Vendor's bundle expires 26 November 2026 at 20:11 UTC and Carol's expires 27 November 2026 at 11:45 UTC. Recorded hashes and signatures stay verifiable forever, while live `current()` requires renewal (`npm run renew -- --send`, before expiry) on the [renewal calendar](#evidence-bundle-renewal-calendar-through-judging).
+- Relay storage and availability: `npm run relay` saves bundles, handed-out one-time entries, cards, inboxes, and files to `.relay-state.json` (set `RELAY_STATE_FILE` to move it, or `RELAY_STATE_FILE=memory` for the old in-memory behaviour), writing a temporary file and renaming it, so a restart keeps undelivered messages. Sign-in tokens are not saved, so clients sign in again. The whole file is rewritten on every change (fine for a demo, not for volume), inbox items are never pruned (each inbox stops at 1,000 items), and availability is still not protected: a relay can drop, withhold, or delete traffic.
 - One-way talking without replies: no ML-KEM ratchet step completes until the peer replies; until then, messages rely on the symmetric chain.
 - Last-resort prekey exposure: if all 20 one-time prekeys are exhausted, handshakes fall back to the last-resort prekey until the next bundle rotation.
 - No skipped-message recovery: counters must match strictly; one lost message requires restarting that direction.
@@ -185,7 +186,8 @@ npm ci
 npm test              # TypeScript protocol + lying-relay tests, then forge test
 npm run cbom:check    # verifies no ecrecover and only PQC precompiles
 npm run evidence      # re-checks all 30 recorded testnet hashes (no keys)
-npm run relay         # in-memory relay on 127.0.0.1:8787
+npm run relay         # relay on 127.0.0.1:8787, state in .relay-state.json
+npm run renew         # dry run: which project bundles expire within 48 h (sends nothing)
 npm run web           # local replay UI (sends nothing)
 ```
 
@@ -202,9 +204,9 @@ Live scripts (`npm run live`, `npm run deploy:directory`, `npm run deploy:memopa
 | `src/DeliveryReceipts.sol` | Records one ML-DSA-87-signed delivery receipt per ciphertext hash |
 | `src/BundleSpike.sol` | Earlier signed-bundle spike contract |
 | `src/ts/` | X25519 + ML-KEM-1024 handshake, double ratchet, client, groups, invoices, safety numbers |
-| `scripts/` | In-memory relay, live exchange, live group, deploy, `evidence.ts` (30 checks), `cbom.ts` |
+| `scripts/` | Local relay (file-backed), live exchange, live group, deploy, `renew-bundles.ts`, `evidence.ts` (30 checks), `cbom.ts` |
 | `apps/web/` | Next.js replay and live browser receipt/bundle verifier (`https://courier-fawn-psi.vercel.app`) |
-| `test/` & `test/ts/` | Foundry unit + invariant tests (`PrekeyDirectory`, `MemoPay`) and Vitest lying-relay/ratchet tests |
+| `test/` & `test/ts/` | Foundry unit + invariant tests (`PrekeyDirectory`, `MemoPay`, `DeliveryReceipts`) and `node:test` protocol, ratchet-refusal, lying-relay, and relay-persistence tests |
 | `deployments/` | Recorded testnet JSON reports and bundle snapshots |
 | `vectors/protocol.json` | Pinned protocol byte vectors |
 
@@ -214,7 +216,7 @@ Live scripts (`npm run live`, `npm run deploy:directory`, `npm run deploy:memopa
 
 1. Before 2 December 2026: record and publish the ≤3-minute demo film (`docs/DEMO.md`) and renew vendor/Carol bundles on schedule through judging.
 2. Browser guest flow: let visitors publish ephemeral browser bundles and run live end-to-end exchanges in the browser.
-3. Durable relay: replace in-memory relay storage with persistent encrypted queues.
+3. Durable relay: replace the single local state file with hosted, replicated queues.
 4. External audit: audit `PrekeyDirectory`, `MemoPay`, `DeliveryReceipts`, and the TypeScript ratchet before mainnet use.
 
 ---
@@ -275,16 +277,27 @@ Live exchange (`deployments/live-exchange.json`, 19 Nov 2026 20:47 UTC): convers
 
 ## Evidence: bundle renewal calendar through judging
 
-`PrekeyDirectory` enforces a 7-day maximum bundle lifetime, so project bundles are renewed on this schedule (each publish costs 360,000 uqor open/close + EVM gas):
+`PrekeyDirectory` enforces a 7-day maximum bundle lifetime, and accepts a new publish at any time, so project bundles are renewed before they expire rather than after.
 
-| Date | Command | Account |
+`npm run renew` (`scripts/renew-bundles.ts`) reads `PrekeyDirectory.current(owner)` for the vendor and Carol and their uqor balances, using read-only calls and no keys, and prints which bundles expire within the window (default 48 hours, `--within <hours>`). It sends nothing unless given `--send`:
+
+```bash
+npm run renew                  # dry run: shows what is due, sends nothing
+npm run renew -- --send        # publishes a fresh bundle for each owner inside the window (needs ~/.haven/ keys)
+```
+
+On 23 November 2026 at 09:31 UTC (chain time) the dry run reported the vendor at 82.7 hours left and Carol at 98.2 hours left, so nothing was due inside 48 hours. With `--within 120` it reported that the vendor would first be funded from `spike` (vendor balance 378,413 uqor, below the script's 600,000 uqor minimum).
+
+Each renewal costs 360,000 uqor for the window open and close plus EVM gas (the first publishes used about 281,000 gas). A renewal is appended to `deployments/renewals.json`, which `npm run evidence` then re-checks with the rest, so its count rises above 30. The recorded first publishes in `deployments/prekey-directory.json` and `deployments/prekeys-courier-carol.json` are not rewritten. The new public bundle replaces `deployments/bundles/<owner>.json` (the previous one is kept in `deployments/bundles/archive/`), and the new prekey secrets replace `~/.haven/courier/<owner>.prekeys.json`. A running relay and live devices need the new bundle published to them again.
+
+Planned schedule (not yet run). Each run renews to 7 days ahead, so the next run falls due 5 days later; when nothing is due the dry run prints `Run again after <time>`, so run it first each time:
+
+| Date (UTC) | Command | Expected result |
 | --- | --- | --- |
-| 26 Nov 2026, after 20:11 UTC | `npm run deploy:directory` | vendor (`qor17zwvy05e9fzerfzksdkhygm92wvapwusvh4zfv`) |
-| 27 Nov 2026, after 11:45 UTC | `npm run deploy:directory courier-carol` | Carol (`qor1tacy6fv8x0jveznhdmyrqc2yep83awk07v3tf4`) |
-| 3 Dec 2026 | `npm run deploy:directory` | vendor |
-| 4 Dec 2026 | `npm run deploy:directory courier-carol` | Carol |
-| 9 Dec 2026 | `npm run deploy:directory` | vendor |
-| 10 Dec 2026 | `npm run deploy:directory courier-carol` | Carol |
+| 25 Nov 2026, after 11:45 | `npm run renew -- --send` | Vendor and Carol both inside 48 hours; both renewed to about 2 Dec |
+| 30 Nov 2026 | `npm run renew -- --send` | Both renewed to about 7 Dec |
+| 5 Dec 2026 | `npm run renew -- --send` | Both renewed to about 12 Dec |
+| 10 Dec 2026 | `npm run renew -- --send` | Both renewed to about 17 Dec |
 
 ---
 

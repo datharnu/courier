@@ -6,7 +6,7 @@ Every step below maps directly to the five demo shots in the hackathon track bri
 
 - Dependencies installed: `npm ci`
 - Accounts and prekeys in `~/.haven` (see `docs/deployments.md`)
-- Note: `steward-vendor`'s bundle expires on **26 Nov 2026, 20:11 UTC** — re-run `npm run deploy:directory` if expired.
+- Note: `steward-vendor`'s bundle expires on **26 Nov 2026, 20:11 UTC** — check with `npm run renew` (dry run) and publish with `npm run renew -- --send` before it expires.
 
 ---
 

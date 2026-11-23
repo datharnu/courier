@@ -17,7 +17,7 @@ The relay sees who messages whom, when, and the sizes. A device that is compromi
 - If the ratchet slips, forward secrecy comes only from one-time prekeys that have already been used up.
 - One dropped message stalls that direction of the conversation for good.
 - If one side keeps sending and the other never replies, no ML-KEM step completes.
-- The relay keeps its state in memory.
+- The relay keeps its state in memory unless it is given a state file. `npm run relay` saves to `.relay-state.json`, so inboxes and files survive a restart, but the relay can still drop or delete anything.
 - A removed member keeps every message and file they already opened.
 - A forwarded invoice still verifies.
 - Safety numbers use SHA-256 and are not compatible with Signal.

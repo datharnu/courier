@@ -42,7 +42,7 @@ The first run was on 19 Nov 2026 at 20:47 UTC.
 
 The vendor's client then erased entry 1's secrets from `~/.haven/courier/steward-vendor.prekeys.json`.
 
-The bundle expires on 26 Nov 2026, 20:11 UTC. That is before judging. Run `npm run deploy:directory` again before a live demo. It publishes a new bundle and replaces the hash. The secret half of the bundle is in `~/.haven/courier/steward-vendor.prekeys.json`, mode 0600, outside the repository.
+The bundle expires on 26 Nov 2026, 20:11 UTC. That is before judging. Run `npm run renew` (a read-only dry run) to see what is due, then `npm run renew -- --send` before a live demo. It publishes a new bundle for each owner inside the window and appends the new hash to `deployments/renewals.json`, leaving this file's recorded publish untouched. (`npm run deploy:directory` also publishes, but rewrites this file.) The secret half of the bundle is in `~/.haven/courier/steward-vendor.prekeys.json`, mode 0600, outside the repository.
 
 ## MemoPay
 

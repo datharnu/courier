@@ -17,9 +17,31 @@ export type RelayOptions = {
   maxInbox?: number;
   tokenTtlSeconds?: number;
   nowMs?: () => number;
+  /**
+   * Where bundles, cards, inboxes, and files outlive the process. Without one, state is in memory.
+   * Sign-in nonces and bearer tokens are never stored: after a restart, clients sign in again.
+   */
+  store?: RelayStore;
 };
 
 type InboxItem = { seq: number; at: number; message: unknown };
+
+/** Everything the relay keeps across a restart. It holds only ciphertext and public keys. */
+export type RelaySnapshot = {
+  version: 1;
+  instance: string;
+  bundles: { evm: string; bundle: Bundle; hash: string; handed: number[] }[];
+  cards: { evm: string; card: RecipientCard }[];
+  inboxes: { evm: string; next: number; items: InboxItem[] }[];
+  files: { id: string; nonce: string; ciphertext: string; hash: string }[];
+};
+
+export type RelayStore = {
+  /** The last saved snapshot, or undefined when nothing was saved yet. */
+  load(): RelaySnapshot | undefined;
+  /** Called after every change, before the response is sent. */
+  save(snapshot: RelaySnapshot): void;
+};
 
 /**
  * Holds ciphertext and public keys, and is never trusted for either.
@@ -41,8 +63,34 @@ export function createRelay(opts: RelayOptions): (request: Request) => Promise<R
   const files = new Map<string, { nonce: string; ciphertext: string; hash: string }>();
   const nonces = new Map<string, { evm: string; expiresAt: number }>();
   const tokens = new Map<string, { evm: string; expiresAt: number }>();
-  /** State is in memory, so sequence numbers restart with the process. A client that sees a new instance starts over. */
-  const instance = bytesToHex(randomBytes(8)).slice(2);
+  /**
+   * Sequence numbers belong to an instance. With a store, the instance and its inboxes survive a restart,
+   * so clients keep their cursor. Without one, a restart is a new instance and clients start over.
+   */
+  let instance = bytesToHex(randomBytes(8)).slice(2);
+
+  const loaded = opts.store?.load();
+  if (loaded) {
+    if (loaded.version !== 1 || typeof loaded.instance !== "string") throw new Error("relay state has an unknown version");
+    instance = loaded.instance;
+    for (const entry of loaded.bundles) {
+      bundles.set(entry.evm, { bundle: entry.bundle, hash: entry.hash, handed: new Set(entry.handed) });
+    }
+    for (const entry of loaded.cards) cards.set(entry.evm, entry.card);
+    for (const entry of loaded.inboxes) inboxes.set(entry.evm, { next: entry.next, items: entry.items });
+    for (const { id, ...file } of loaded.files) files.set(id, file);
+  }
+
+  function persist(): void {
+    opts.store?.save({
+      version: 1,
+      instance,
+      bundles: [...bundles].map(([evm, entry]) => ({ evm, bundle: entry.bundle, hash: entry.hash, handed: [...entry.handed] })),
+      cards: [...cards].map(([evm, card]) => ({ evm, card })),
+      inboxes: [...inboxes].map(([evm, inbox]) => ({ evm, next: inbox.next, items: inbox.items })),
+      files: [...files].map(([id, file]) => ({ id, ...file })),
+    });
+  }
 
   /** The address a live bearer token was issued to, or undefined. */
   function signedIn(request: Request): string | undefined {
@@ -83,6 +131,7 @@ export function createRelay(opts: RelayOptions): (request: Request) => Promise<R
         const entry = existing?.hash === hash ? existing : { bundle: body.bundle, hash, handed: new Set<number>() };
         for (const index of spent) entry.handed.add(index);
         bundles.set(evm, entry);
+        persist();
         return json(200, { hash });
       }
       if (method === "GET") {
@@ -96,6 +145,8 @@ export function createRelay(opts: RelayOptions): (request: Request) => Promise<R
             break;
           }
         }
+        // A handed-out entry stays handed out after a restart, so it is not given to a second sender.
+        if (oneTimeIndex !== null) persist();
         return json(200, { bundle: entry.bundle, oneTimeIndex });
       }
     }
@@ -116,6 +167,7 @@ export function createRelay(opts: RelayOptions): (request: Request) => Promise<R
           return fail(409, "CARD", error instanceof Error ? error.message : "card refused");
         }
         cards.set(evm, body.card);
+        persist();
         return json(200, { ok: true });
       }
       if (method === "GET") {
@@ -174,6 +226,7 @@ export function createRelay(opts: RelayOptions): (request: Request) => Promise<R
         const seq = inbox.next++;
         inbox.items.push({ seq, at: nowMs(), message: body.message });
         inboxes.set(evm, inbox);
+        persist();
         return json(200, { seq });
       }
       if (method === "GET") {
@@ -195,6 +248,7 @@ export function createRelay(opts: RelayOptions): (request: Request) => Promise<R
         }
         if (keccak256(body.ciphertext as `0x${string}`) !== id) return fail(409, "FILE_ID", "id is not the ciphertext's hash");
         files.set(id, { nonce: body.nonce, ciphertext: body.ciphertext, hash: body.hash });
+        persist();
         return json(200, { id });
       }
       if (method === "GET") {

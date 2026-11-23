@@ -15,6 +15,7 @@
     "relay": "tsx scripts/relay.ts",
     "live": "tsx scripts/live-exchange.ts",
     "live:group": "tsx scripts/live-group.ts",
+    "renew": "tsx scripts/renew-bundles.ts",
     "web": "npm run dev --prefix apps/web",
     "safety": "tsx scripts/safety.ts",
     "cbom": "tsx scripts/cbom.ts --chain",

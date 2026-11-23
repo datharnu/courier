@@ -19,7 +19,7 @@ const ITEMS = [
   },
   {
     q: "What does the relay learn?",
-    a: "Who messages whom, when, and the sizes. It holds ciphertext, public bundles, and signed cards. A restart forgets the inbox. This build keeps that state in memory. It is not the stateless relay the design describes.",
+    a: "Who messages whom, when, and the sizes. It holds ciphertext, public bundles, and signed cards. The recorded runs used an in-memory relay, which forgets the inbox on restart. `npm run relay` now saves inboxes and files to a local file so they survive a restart. It can still drop anything, and it is not the stateless relay the design describes.",
   },
   {
     q: "Are the safety numbers Signal’s?",

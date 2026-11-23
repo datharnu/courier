@@ -13,3 +13,5 @@ broadcast
 cbom.json
 cards/
 deployments/*.local.json
+.relay-state.json
+.relay-state.json.*.tmp
