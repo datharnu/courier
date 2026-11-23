@@ -23,7 +23,7 @@ Why not an existing messenger or plain encrypted chat? Harvest-now, decrypt-late
 
 What is the biggest risk? Published prekey bundles expire after at most 7 days on chain and must be renewed (`npm run renew`), the relay can still drop or withhold traffic (its state now survives a restart, but availability is not protected), and one-way messages do not rekey until the peer replies (see [Known limits](#known-limits)).
 
-How can a judge try it right now? Open [courier-fawn-psi.vercel.app/app/try](https://courier-fawn-psi.vercel.app/app/try): a client and a vendor in one page send a message and an invoice file through an in-page relay, running Courier's real handshake and ratchet in the browser against the demo vendor's bundle hash on chain. Switch the relay to lying and the client refuses with `BUNDLE_HASH` before sealing anything. The two identities on that page are public demo keys (committed on purpose; they hold nothing). Or open [courier-fawn-psi.vercel.app/app/receipt](https://courier-fawn-psi.vercel.app/app/receipt) and click Verify all to check the vendor bundle, Carol's bundle, and the recorded delivery receipt live against QoreChain Diana with no wallet, or clone the repo and run `npm test` and `npm run evidence` (30 checks, 0 keys).
+How can a judge try it right now? Open [courier-fawn-psi.vercel.app/app/try](https://courier-fawn-psi.vercel.app/app/try): a client and a vendor in one page send a message and an invoice file through an in-page relay, running Courier's real handshake and ratchet in the browser against the demo vendor's bundle hash on chain. Switch the relay to lying and the client refuses with `BUNDLE_HASH` before sealing anything. The two identities on that page are public demo keys (committed on purpose; they hold nothing). Or open [courier-fawn-psi.vercel.app/app/receipt](https://courier-fawn-psi.vercel.app/app/receipt) and click Verify all to check the vendor bundle, Carol's bundle, and the recorded delivery receipt live against QoreChain Diana with no wallet, or clone the repo and run `npm test` and `npm run evidence` (35 checks, 0 keys).
 
 ---
 
@@ -100,7 +100,7 @@ Everything below runs on QoreChain Diana (`qorechain-diana`, EVM chain ID `9800`
    npm ci
    npm run evidence
    ```
-   On 21 November 2026 `npm run evidence` printed 30 passed, 0 failed.
+   On 23 November 2026 `npm run evidence` printed 35 passed, 0 failed (30 on 21 November; the 5 added checks are the `/app/try` demo accounts in `deployments/demo-identities.json`).
 4. Offline contract, protocol, lying-relay, and CBOM tests (no chain, no keys):
    ```bash
    npm test          # runs npm run test:ts (lying relay, ratchet, groups) + forge test
@@ -139,7 +139,7 @@ Built for Build Before Q-Day (`https://build.qorechain.io/`), category bounty En
 | ML-DSA key binding | `PrekeyDirectory.publish` and `DeliveryReceipts.record` verify ML-DSA-87 signatures via `pqcVerify`; flipped signature bytes revert `SignatureInvalid` (`0x37e8456b`). | Binding covers bundle hashes and receipt ciphertext hashes; message contents never touch the chain. |
 | Client-side encryption and decryption | Clients seal and open all messages, files, and invoices locally; relay holds ciphertext only; `MemoPay` stores only `keccak256(ciphertext)` (132-byte calldata). | Safety numbers use SHA-256 (not Signal SHA-512); groups have no on-chain membership contract. |
 | Public GitHub repository under MIT or Apache-2.0 | `https://github.com/datharnu/courier`, Apache-2.0 (`LICENSE`). | No QCAI dashboard audit has been run (not required for Encrypted Apps). |
-| README, testnet addresses, and video (up to 3 min) | This single-file `README.md` holds all addresses, hashes, and limits; shot list in `docs/DEMO.md`. | Film not recorded yet; must be recorded and linked before 2 December 2026. |
+| README, testnet addresses, and video (up to 3 min) | This single-file `README.md` holds all addresses, hashes, and limits; shot list in `docs/DEMO.md`. | Video recorded (2:32); link not yet added to the project page (due before 2 December 2026). |
 
 ---
 
@@ -150,7 +150,7 @@ Built for Build Before Q-Day (`https://build.qorechain.io/`), category bounty En
 - Deployed `PrekeyDirectory`, `MemoPay`, and `DeliveryReceipts` on `qorechain-diana` with two live bundles (vendor and Carol), and completed the live exchange, `MemoPay` payment, three-member group run, and Haven Escrow file carry ([full hashes and details](#evidence-directory-exchange-memopay-group-and-escrow-carry)).
 - Live browser verification at `https://courier-fawn-psi.vercel.app/app/receipt` passed on 21 November 2026 at 390px and 1440px (0 horizontal overflow, 0 RPC errors).
 - `/app/try` against the live chain, no mocks (`COURIER_LIVE=1 npx playwright test e2e/try-live.spec.ts` in `apps/web`, on a local build, 23 November 2026): the page read `current(courier-demo-vendor)` = `0x0f13517a19a3a1df5a333553b0bff2384cb577cd076deac06a988a6fee4a4175` and the demo client's registered ML-DSA-87 key; the honest run delivered the message, `INV-0007.json`, and the vendor's reply with a 1,568-byte ML-KEM ratchet ciphertext; the lying relay was refused with `BUNDLE_HASH` (0 bytes sealed); a flipped byte was refused with `AEAD`. The deployed site needs a redeploy to serve `/app/try`.
-- CLI checks passed on 21 November 2026: `npm run evidence` (30 passed, 0 failed), `npm run cbom:check`, and `npm test` (Foundry + `node:test` lying-relay suite).
+- CLI checks passed on 21 November 2026: `npm run evidence` (30 passed, 0 failed; 35 passed, 0 failed on 23 November with the `/app/try` demo accounts), `npm run cbom:check`, and `npm test` (Foundry + `node:test` lying-relay suite).
 
 ### Built, not observed
 
@@ -224,7 +224,7 @@ cd courier
 npm ci
 npm test              # TypeScript protocol + lying-relay tests, then forge test
 npm run cbom:check    # verifies no ecrecover and only PQC precompiles
-npm run evidence      # re-checks all 30 recorded testnet hashes (no keys)
+npm run evidence      # re-checks all 35 recorded testnet hashes (no keys)
 npm run relay         # relay on 127.0.0.1:8787, state in .relay-state.json
 npm run renew         # dry run: which project bundles (incl. the /app/try demo vendor) expire within 48 h (sends nothing)
 npm run web           # local replay UI (sends nothing)
@@ -243,7 +243,7 @@ Live scripts (`npm run live`, `npm run deploy:directory`, `npm run deploy:memopa
 | `src/DeliveryReceipts.sol` | Records one ML-DSA-87-signed delivery receipt per ciphertext hash |
 | `src/BundleSpike.sol` | Earlier signed-bundle spike contract |
 | `src/ts/` | X25519 + ML-KEM-1024 handshake, double ratchet, client, groups, invoices, safety numbers |
-| `scripts/` | Local relay (file-backed), live exchange, live group, deploy, `renew-bundles.ts`, `evidence.ts` (30 checks), `cbom.ts` |
+| `scripts/` | Local relay (file-backed), live exchange, live group, deploy, `renew-bundles.ts`, `evidence.ts` (35 checks), `cbom.ts` |
 | `apps/web/` | Next.js replay, live browser receipt/bundle verifier, and the `/app/try` lying-relay demo (`https://courier-fawn-psi.vercel.app`) |
 | `apps/web/lib/protocol/` | Copies of the six browser-safe `src/ts` protocol files (`npm run web:sync`, checked in CI) |
 | `apps/web/fixtures/demo/identities.json` | The two public demo identities for `/app/try` (secret keys public on purpose) |
@@ -332,7 +332,7 @@ npm run renew -- --send        # publishes a fresh bundle for each owner inside 
 
 On 23 November 2026 at 09:31 UTC (chain time) the dry run reported the vendor at 82.7 hours left and Carol at 98.2 hours left, so nothing was due inside 48 hours. With `--within 120` it reported that the vendor would first be funded from `spike` (vendor balance 378,413 uqor, below the script's 600,000 uqor minimum).
 
-Each renewal costs 360,000 uqor for the window open and close plus EVM gas (the first publishes used about 281,000 gas). A renewal is appended to `deployments/renewals.json`, which `npm run evidence` then re-checks with the rest, so its count rises above 30. The recorded first publishes in `deployments/prekey-directory.json` and `deployments/prekeys-courier-carol.json` are not rewritten. The new public bundle replaces `deployments/bundles/<owner>.json` (the previous one is kept in `deployments/bundles/archive/`), and the new prekey secrets replace `~/.haven/courier/<owner>.prekeys.json`. A running relay and live devices need the new bundle published to them again.
+Each renewal costs 360,000 uqor for the window open and close plus EVM gas (the first publishes used about 281,000 gas). A renewal is appended to `deployments/renewals.json`, which `npm run evidence` then re-checks with the rest, so its count rises above 35. The recorded first publishes in `deployments/prekey-directory.json` and `deployments/prekeys-courier-carol.json` are not rewritten. The new public bundle replaces `deployments/bundles/<owner>.json` (the previous one is kept in `deployments/bundles/archive/`), and the new prekey secrets replace `~/.haven/courier/<owner>.prekeys.json`. A running relay and live devices need the new bundle published to them again.
 
 Planned schedule (not yet run). Each run renews to 7 days ahead, so the next run falls due 5 days later; when nothing is due the dry run prints `Run again after <time>`, so run it first each time:
 
