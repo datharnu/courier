@@ -4,6 +4,9 @@ import { test } from "node:test";
 
 import * as demoKeysModule from "../../apps/web/lib/try/demo-keys.js";
 import * as flowModule from "../../apps/web/lib/try/flow.js";
+import * as registryModule from "../../apps/web/lib/try/registry.js";
+import { deriveUnifiedAccount } from "@qorechain/sdk";
+import { bytesToHex } from "viem";
 import type { ChainView, DemoInput } from "../../apps/web/lib/try/flow.js";
 
 // apps/web has no "type": "module", so Node loads these files as CommonJS. Node 22 does not always
@@ -13,15 +16,22 @@ function cjs<T extends object>(ns: T): T {
 }
 const { bytesOf, demoBundleHash, parseDemoFixture } = cjs(demoKeysModule);
 const { ZERO_HASH, bundleState, runDemo } = cjs(flowModule);
+const { parseKemReply } = cjs(registryModule);
 
 /** The committed public demo identities. The chain read is mocked: no network. */
 const fixture = parseDemoFixture(JSON.parse(readFileSync("apps/web/fixtures/demo/identities.json", "utf8")));
+/** The vendor's ML-DSA-87 key, as pqcKeyStatus would return it. */
+const vendorMldsa = bytesOf(fixture.vendor.mldsaPublic);
+
+test("the fixture's vendor ML-DSA-87 key is the one its public mnemonic derives", async () => {
+  assert.equal(bytesToHex((await deriveUnifiedAccount(fixture.vendor.mnemonic)).pqc.publicKey), fixture.vendor.mldsaPublic);
+});
 const NOW = 1_795_500_000;
 const EXPIRY = NOW + 3 * 24 * 3600;
 const INVOICE = JSON.stringify({ invoiceId: "INV-0007", amount: "10000", token: "fUSD", payee: "registered payout" });
 
 function chain(overrides: Partial<ChainView> = {}): ChainView {
-  return { hash: demoBundleHash(fixture, EXPIRY), expiry: EXPIRY, live: true, now: NOW, clientMldsa: bytesOf(fixture.client.mldsaPublic), ...overrides };
+  return { hash: demoBundleHash(fixture, EXPIRY), expiry: EXPIRY, live: true, now: NOW, clientMldsa: bytesOf(fixture.client.mldsaPublic), vendorMldsa, vendorRegistryKem: fixture.vendor.identityKem, ...overrides };
 }
 
 function input(overrides: Partial<DemoInput> = {}): DemoInput {
@@ -56,7 +66,8 @@ test("every run is a fresh conversation, so the demo repeats", () => {
   const second = runDemo(input());
   assert.equal(first.outcome, "delivered");
   assert.equal(second.outcome, "delivered");
-  assert.notEqual(first.relay[1].preview, second.relay[1].preview);
+  const handshakeOf = (run: typeof first) => run.relay.find((item) => item.label.startsWith("Handshake"))?.preview;
+  assert.notEqual(handshakeOf(first), handshakeOf(second));
 });
 
 test("lying relay: the swapped bundle is refused with BUNDLE_HASH before anything is sealed", () => {
@@ -103,4 +114,51 @@ test("bundle state: unpublished, live, expired", () => {
   const live = bundleState(chain());
   assert.equal(live.kind, "live");
   assert.equal(live.kind === "live" && Math.round(live.hoursLeft), 72);
+});
+
+test("the bundle's identity key and the card are checked against the chain's registered keys", () => {
+  const run = runDemo(input());
+  assert.equal(run.outcome, "delivered");
+  assert.equal(run.keys?.registryKem, run.keys?.bundleIdentityKem);
+  assert.equal(run.keys?.cardVerified, true);
+  assert.equal(run.keys?.cardX25519, fixture.vendor.identityX25519Public);
+});
+
+test("a registry key that differs from the bundle's identity key is refused with IDENTITY_KEM", () => {
+  const other = `0x${"ab".repeat(1568)}`;
+  const run = runDemo(input({ chain: chain({ vendorRegistryKem: other }) }));
+  assert.equal(run.refusal?.code, "IDENTITY_KEM");
+  assert.equal(run.sealedBytes, 0);
+});
+
+test("an unreadable KEM registry is refused, not filled in from the demo file", () => {
+  const run = runDemo(input({ chain: chain({ vendorRegistryKem: null }) }));
+  assert.equal(run.refusal?.code, "IDENTITY_KEM");
+  assert.equal(run.sealedBytes, 0);
+});
+
+test("lying relay: a swapped X25519 card key is refused with CARD before anything is sealed", () => {
+  const run = runDemo(input({ relay: "lying-card" }));
+  assert.equal(run.refusal?.code, "CARD");
+  assert.equal(run.refusal?.by, "client");
+  assert.equal(run.keys?.cardVerified, false);
+  assert.notEqual(run.keys?.cardX25519, fixture.vendor.identityX25519Public);
+  assert.equal(run.sealedBytes, 0);
+});
+
+test("a card checked against a different ML-DSA-87 key is refused with CARD", () => {
+  assert.equal(runDemo(input({ chain: chain({ vendorMldsa: bytesOf(fixture.client.mldsaPublic) }) })).refusal?.code, "CARD");
+  assert.equal(runDemo(input({ chain: chain({ vendorMldsa: null }) })).refusal?.code, "CARD");
+});
+
+test("the KEM registry reply is parsed strictly", () => {
+  const address = fixture.vendor.cosmos;
+  const key = Buffer.from(bytesOf(fixture.vendor.identityKem)).toString("base64");
+  const good = parseKemReply({ found: true, key: { address, algorithm_id: 2, algorithm_name: "mlkem1024", public_key: key } }, address);
+  assert.deepEqual(good, { ok: true, kem: fixture.vendor.identityKem });
+  assert.deepEqual(parseKemReply({ found: false }, address), { ok: true, kem: null });
+  assert.equal(parseKemReply({ found: true, key: { address: "qor1other", algorithm_id: 2, public_key: key } }, address).ok, false);
+  assert.equal(parseKemReply({ found: true, key: { address, algorithm_id: 1, public_key: key } }, address).ok, false);
+  assert.equal(parseKemReply({ found: true, key: { address, algorithm_id: 2, public_key: Buffer.from([1, 2, 3]).toString("base64") } }, address).ok, false);
+  assert.equal(bytesToHex(bytesOf(fixture.vendor.identityKem)), fixture.vendor.identityKem);
 });

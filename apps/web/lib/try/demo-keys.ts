@@ -7,6 +7,7 @@
  * prekeys are fixed: a renewal publishes the same keys with a new expiry, so the page keeps working
  * after `npm run renew -- --send` without a redeploy.
  */
+import type { RecipientCard } from "@qorechain/qoreseal";
 import { hexToBytes, type Hex } from "viem";
 import { bundleHash, type Bundle, type BundleSecrets, type OneTimePublic } from "../protocol/bundle";
 
@@ -23,6 +24,10 @@ export type DemoVendor = {
   identityKem: string;
   identityX25519Public: string;
   identityX25519Secret: string;
+  /** The vendor's ML-DSA-87 public key (what pqcKeyStatus returns once registered). Tests use it to mock the chain. */
+  mldsaPublic: string;
+  /** QoreSeal recipient card: the X25519 key, signed with the vendor's classical and ML-DSA-87 keys. */
+  card: RecipientCard;
   prekeys: {
     signedPrekey: string;
     lastResortKem: string;
@@ -59,6 +64,7 @@ export function parseDemoFixture(value: unknown): DemoFixture {
     fixture.network === "qorechain-diana" &&
     fixture.vendor?.name === DEMO_VENDOR &&
     fixture.client?.name === DEMO_CLIENT &&
+    typeof fixture.vendor.card?.x25519PublicKey === "string" &&
     /^0x[0-9a-f]{40}$/.test(fixture.directory) &&
     /^0x[0-9a-f]{40}$/.test(fixture.vendor.evm) &&
     /^0x[0-9a-f]{40}$/.test(fixture.client.evm) &&

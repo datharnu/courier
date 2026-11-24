@@ -12,6 +12,8 @@
  * "one-time" across visitors. The last-resort prekey is the one the protocol already reuses; each
  * run still has a fresh ephemeral X25519 key and a fresh ML-KEM encapsulation.
  */
+import { randomBytes } from "@noble/ciphers/utils.js";
+import { verifyRecipientCard, x25519PublicKey, type RecipientCard } from "@qorechain/qoreseal";
 import { bytesToHex, keccak256, type Hex } from "viem";
 import { canonical, CourierError, utf8 } from "../protocol/bytes";
 import { bundleHash, createBundle, type Bundle } from "../protocol/bundle";
@@ -24,15 +26,31 @@ import { bytesOf, demoBundle, demoSecrets, type DemoFixture } from "./demo-keys"
 export const DEMO_KEM_EVERY = 2;
 export const ZERO_HASH = `0x${"0".repeat(64)}`;
 
-export type RelayMode = "honest" | "lying";
+/** "lying" swaps the vendor's prekey bundle; "lying-card" swaps the X25519 key in the vendor's recipient card. */
+export type RelayMode = "honest" | "lying" | "lying-card";
 
-/** What the page read from the chain. `clientMldsa` is null when the client has no registered key. */
+/**
+ * What the page read from the chain. A null key means the chain has none (or could not be read): the
+ * page never falls back to the demo file for it.
+ */
 export type ChainView = {
   hash: string;
   expiry: number;
   live: boolean;
   now: number;
   clientMldsa: Uint8Array | null;
+  /** The vendor's ML-DSA-87 key from `pqcKeyStatus`. It verifies the vendor's recipient card. */
+  vendorMldsa: Uint8Array | null;
+  /** The vendor's ML-KEM-1024 key from the chain's KEM registry, lowercase 0x hex. */
+  vendorRegistryKem: string | null;
+};
+
+/** What the client compared before sealing: chain on one side, relay on the other. */
+export type KeyChecks = {
+  registryKem: string | null;
+  bundleIdentityKem: string;
+  cardX25519: string;
+  cardVerified: boolean;
 };
 
 export type BundleState =
@@ -76,6 +94,7 @@ export type DemoRun = {
   relay: RelayItem[];
   invoiceText?: string;
   kemStep?: { ciphertextBytes: number };
+  keys?: KeyChecks;
 };
 
 export type DemoInput = {
@@ -105,9 +124,17 @@ class PageRelay {
   /** The honest relay serves the vendor's signed bundle. The lying one serves a bundle whose keys it holds. */
   bundle(): Bundle {
     const genuine = demoBundle(this.fixture, this.chain.expiry);
-    if (this.mode === "honest") return genuine;
+    if (this.mode !== "lying") return genuine;
     this.forged ??= createBundle(bytesOf(this.fixture.vendor.identityKem), genuine.expiry).bundle;
     return this.forged;
+  }
+
+  /** The vendor's recipient card. The lying-card relay swaps in an X25519 key it holds. */
+  card(): RecipientCard {
+    const genuine = this.fixture.vendor.card;
+    if (this.mode !== "lying-card") return genuine;
+    const own = bytesToHex(x25519PublicKey(randomBytes(32))).slice(2);
+    return { ...genuine, x25519PublicKey: own };
   }
 
   post(item: RelayItem): void {
@@ -143,7 +170,43 @@ export function runDemo(input: DemoInput): DemoRun {
     text: `Relay sent a bundle hashing to ${short(relayHash)}. The chain says ${short(chainHash)}.`,
   });
 
-  // 2. Handshake and first message. startHandshake checks the hash, the registry key and the expiry first.
+  // 2. The bundle against the chain: its hash against PrekeyDirectory, its identity key against the KEM registry.
+  //    startHandshake repeats both checks; doing them here first lets the page show each one.
+  const registryKem = chain.vendorRegistryKem?.toLowerCase() ?? null;
+  const offeredCard = relay.card();
+  relay.post({ label: "Vendor recipient card handed to the client", from: "relay", bytes: utf8(JSON.stringify(offeredCard)).length, preview: `0x${offeredCard.x25519PublicKey}` });
+  const keys: KeyChecks = { registryKem, bundleIdentityKem: offered.identityKem, cardX25519: `0x${offeredCard.x25519PublicKey}`, cardVerified: false };
+  const refuse = (code: string, reason: string): DemoRun => {
+    const refusal: Refusal = { code, by: "client", reason };
+    client.push({ tone: "refused", text: `Refused ${code}: ${reason}. Nothing was sealed.` });
+    return run("refused", { refusal, keys });
+  };
+  if (relayHash !== chainHash) return refuse("BUNDLE_HASH", "bundle does not match the chain");
+  if (!registryKem) return refuse("IDENTITY_KEM", "the chain's KEM registry could not be read for the vendor, and the page does not fall back to the demo file");
+  if (offered.identityKem !== registryKem) return refuse("IDENTITY_KEM", "the bundle's identity ML-KEM key is not the key in the chain's KEM registry");
+  client.push({ tone: "check", text: `Bundle identity ML-KEM-1024 key matches the chain's KEM registry (${short(registryKem)}).` });
+
+  // 3. The recipient card: the X25519 key is not stored on chain. The card carries it, signed with the vendor's
+  //    ML-DSA-87 key (read from the chain) and naming the registry ML-KEM key by its SHA3-256.
+  if (!chain.vendorMldsa) return refuse("CARD", "the vendor has no registered ML-DSA-87 key on chain to check its card against");
+  let vendorX25519: Uint8Array;
+  try {
+    const verified = verifyRecipientCard({
+      card: offeredCard,
+      chainId: fixture.network,
+      address: fixture.vendor.cosmos,
+      pqPublicKey: chain.vendorMldsa,
+      mlkemPublicKey: bytesOf(registryKem),
+    });
+    if (!verified.x25519PublicKey) throw new Error("the card has no X25519 key");
+    vendorX25519 = verified.x25519PublicKey;
+  } catch (error) {
+    return refuse("CARD", `the vendor's recipient card does not verify under its on-chain keys (${error instanceof Error ? error.message : "refused"})`);
+  }
+  keys.cardVerified = true;
+  client.push({ tone: "check", text: `Recipient card X25519 key ${short(keys.cardX25519)} is signed by the vendor's on-chain ML-DSA-87 key.` });
+
+  // 4. Handshake and first message. startHandshake checks the hash, the registry key and the expiry again.
   let handshake: HandshakeMessage;
   let clientSession: Session;
   try {
@@ -153,10 +216,10 @@ export function runDemo(input: DemoInput): DemoRun {
         mldsaSecret: bytesOf(fixture.client.mldsaSecret),
         identityX25519Secret: bytesOf(fixture.client.identityX25519Secret),
       },
-      recipient: { address: fixture.vendor.evm, identityX25519Public: bytesOf(fixture.vendor.identityX25519Public) },
+      recipient: { address: fixture.vendor.evm, identityX25519Public: vendorX25519 },
       bundle: offered,
       chainHash,
-      registryKem: fixture.vendor.identityKem,
+      registryKem,
       oneTimeIndex: null,
       now: chain.now,
       plaintext: utf8(canonical({ t: "text", body: input.message })),
@@ -165,12 +228,12 @@ export function runDemo(input: DemoInput): DemoRun {
   } catch (error) {
     const refusal = refusalOf(error, "client");
     client.push({ tone: "refused", text: `Refused ${refusal.code}: ${refusal.reason}. Nothing was sealed.` });
-    return run("refused", { refusal });
+    return run("refused", { refusal, keys });
   }
   const handshakeBytes = utf8(canonical(handshake)).length;
   sealedBytes += handshakeBytes;
   relay.post({ label: "Handshake + first message", from: "client", bytes: handshakeBytes, preview: preview(handshake.kemCiphertext) });
-  client.push({ tone: "check", text: "Bundle hash matches the chain. Bundle not expired. Identity KEM is the registry key." });
+  client.push({ tone: "check", text: "Bundle hash matches the chain and the bundle is not expired." });
   client.push({ tone: "sent", text: input.message, detail: "Handshake: 3 X25519 + ML-KEM-1024 to the last-resort prekey, signed with ML-DSA-87." });
 
   // 3. The invoice file: its own random key, the key inside a ratchet message.
@@ -197,7 +260,7 @@ export function runDemo(input: DemoInput): DemoRun {
   if (!chain.clientMldsa) {
     const refusal: Refusal = { code: "SIGNATURE", by: "vendor", reason: "the client has no registered ML-DSA-87 key on chain" };
     vendor.push({ tone: "refused", text: `Refused ${refusal.code}: ${refusal.reason}.` });
-    return run("refused", { refusal });
+    return run("refused", { refusal, keys });
   }
   let vendorSession: Session;
   try {
@@ -209,7 +272,7 @@ export function runDemo(input: DemoInput): DemoRun {
       senderMldsaPublic: chain.clientMldsa,
       senderCardX25519: fixture.client.identityX25519Public,
       chainHash,
-      registryKem: fixture.vendor.identityKem,
+      registryKem,
       now: chain.now,
       used: new Set<number>(),
       kemEvery: DEMO_KEM_EVERY,
@@ -221,7 +284,7 @@ export function runDemo(input: DemoInput): DemoRun {
   } catch (error) {
     const refusal = refusalOf(error, "vendor");
     vendor.push({ tone: "refused", text: `Refused ${refusal.code}: ${refusal.reason}.` });
-    return run("refused", { refusal });
+    return run("refused", { refusal, keys });
   }
 
   // 5. The file key message, then the file from the relay.
@@ -239,7 +302,7 @@ export function runDemo(input: DemoInput): DemoRun {
       tone: "refused",
       text: `Refused ${refusal.code}: ${refusal.reason}. The session did not move, so the untouched message would still open.`,
     });
-    return run("refused", { refusal });
+    return run("refused", { refusal, keys });
   }
 
   // 6. The vendor replies. It encapsulates to the ML-KEM key the client offered: a ratchet step.
@@ -260,9 +323,9 @@ export function runDemo(input: DemoInput): DemoRun {
   } catch (error) {
     const refusal = refusalOf(error, "client");
     client.push({ tone: "refused", text: `Refused ${refusal.code}: ${refusal.reason}.` });
-    return run("refused", { refusal });
+    return run("refused", { refusal, keys });
   }
-  return run("delivered", { invoiceText, kemStep });
+  return run("delivered", { invoiceText, kemStep, keys });
 }
 
 function parsePayload(plain: Uint8Array): Payload {

@@ -12,8 +12,16 @@ import { demoBundleHash, parseDemoFixture } from "../lib/try/demo-keys";
 const fixture = parseDemoFixture(JSON.parse(readFileSync(join(process.cwd(), "fixtures/demo/identities.json"), "utf8")));
 const NOW = Math.floor(Date.now() / 1000);
 
-async function mockChain(page: Page, opts: { expiry: number; now: number; hash?: string }) {
+/** The KEM registry reply the REST API gives, as base64. */
+function kemReply(hex: string) {
+  return { found: true, key: { address: fixture.vendor.cosmos, algorithm_id: 2, algorithm_name: "mlkem1024", public_key: Buffer.from(hex.slice(2), "hex").toString("base64"), registered_height: "1" } };
+}
+
+async function mockChain(page: Page, opts: { expiry: number; now: number; hash?: string; registryKem?: string }) {
   const hash = (opts.hash ?? demoBundleHash(fixture, opts.expiry)) as Hex;
+  await page.route("**/chain-rest/kem/**", async (route) => {
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify(kemReply(opts.registryKem ?? fixture.vendor.identityKem)) });
+  });
   await page.route("https://evm-testnet.qore.host/**", async (route) => {
     const body = JSON.parse(route.request().postData() ?? "{}") as { id: number; method: string; params: unknown[] };
     let result: unknown = null;
@@ -24,7 +32,9 @@ async function mockChain(page: Page, opts: { expiry: number; now: number; hash?:
       if (to === fixture.directory) {
         result = encodeFunctionResult({ abi: directoryAbi, functionName: "current", result: [hash, BigInt(opts.expiry), opts.expiry >= opts.now] });
       } else if (to === PQC_STATUS) {
-        result = encodeFunctionResult({ abi: pqcAbi, functionName: "pqcKeyStatus", result: [true, 1, fixture.client.mldsaPublic as Hex, true] });
+        const data = String((body.params[0] as { data: string }).data).toLowerCase();
+        const key = data.includes(fixture.vendor.evm.slice(2)) ? fixture.vendor.mldsaPublic : fixture.client.mldsaPublic;
+        result = encodeFunctionResult({ abi: pqcAbi, functionName: "pqcKeyStatus", result: [true, 1, key as Hex, true] });
       }
     }
     await route.fulfill({ contentType: "application/json", body: JSON.stringify({ jsonrpc: "2.0", id: body.id, result }) });
@@ -49,7 +59,7 @@ test("lying relay: the client refuses with BUNDLE_HASH and seals nothing", async
   await mockChain(page, { expiry: NOW + 3 * 24 * 3600, now: NOW });
   await page.goto("/app/try");
   await expect(page.getByTestId("chain-state")).toContainText("Live.");
-  await page.getByRole("radio", { name: /Lying/ }).click();
+  await page.getByRole("radio", { name: "Lying (swap the vendor's prekey bundle)" }).click();
   await page.getByRole("button", { name: "Send message and invoice" }).click();
   const refusal = page.getByTestId("refusal");
   await expect(refusal).toContainText("Refused BUNDLE_HASH by the client", { timeout: 20_000 });
@@ -85,4 +95,24 @@ test("the page fits at 390px and the home page links to it", async ({ page }) =>
   await expect(page.getByTestId("chain-state")).toContainText("Live.");
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
+});
+
+test("lying relay: a swapped card key is refused with CARD, shown beside the registry check", async ({ page }) => {
+  await mockChain(page, { expiry: NOW + 3 * 24 * 3600, now: NOW });
+  await page.goto("/app/try");
+  await expect(page.getByTestId("vendor-registry")).toContainText("registered ML-KEM-1024 key");
+  await page.getByRole("radio", { name: "Lying (swap the vendor's card key)" }).click();
+  await page.getByRole("button", { name: "Send message and invoice" }).click();
+  await expect(page.getByTestId("refusal")).toContainText("Refused CARD by the client", { timeout: 20_000 });
+  await expect(page.getByTestId("card-check")).toContainText("signature does not verify");
+  await expect(page.getByTestId("kem-check")).toContainText("match");
+});
+
+test("a registry key that differs from the bundle is refused with IDENTITY_KEM", async ({ page }) => {
+  await mockChain(page, { expiry: NOW + 3 * 24 * 3600, now: NOW, registryKem: `0x${"ab".repeat(1568)}` });
+  await page.goto("/app/try");
+  await expect(page.getByTestId("chain-state")).toContainText("Live.");
+  await page.getByRole("button", { name: "Send message and invoice" }).click();
+  await expect(page.getByTestId("refusal")).toContainText("Refused IDENTITY_KEM by the client", { timeout: 20_000 });
+  await expect(page.getByTestId("kem-check")).toContainText("differ");
 });

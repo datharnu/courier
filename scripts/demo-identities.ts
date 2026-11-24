@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { ALGORITHM_ML_KEM_1024, deriveSealKeys, validateMlkemPublicKey } from "@qorechain/qoreseal";
+import { ALGORITHM_ML_KEM_1024, deriveSealKeys, signRecipientCard, validateMlkemPublicKey, verifyRecipientCard } from "@qorechain/qoreseal";
+import { classicalKeyFromPrivate } from "@qorechain/qoresign";
 import { fetchKemKey } from "@qorechain/qoreseal/network";
 import {
   REGISTER_KEM_KEY_TYPE_URL,
@@ -26,6 +27,7 @@ import { DEMO_CLIENT, DEMO_VENDOR, DEMO_WARNING, demoBundleHash, type DemoFixtur
  *   npm run demo:identities                   # plan: reads the chain, prints each step and its cost, sends nothing
  *   npm run demo:identities -- --create       # writes the fixture (local key generation, no network). Never overwrites.
  *   npm run demo:identities -- --broadcast    # runs the missing steps below, paid from `spike` (~/.haven/spike.env)
+ *   npm run demo:identities -- --card         # signs the vendor's QoreSeal recipient card into the fixture (local, no network)
  *
  * Steps, each skipped when the chain already shows it done:
  *   1. fund the client and the vendor from spike (bank send, hybrid-signed by spike)
@@ -86,6 +88,33 @@ function sameBytes(a: string | Uint8Array | undefined, b: Uint8Array): boolean {
   return bytes.length === b.length && bytes.every((byte, i) => byte === b[i]);
 }
 
+/**
+ * The vendor's recipient card: its X25519 key and the SHA3-256 of its ML-KEM-1024 key, signed with the
+ * vendor's classical and ML-DSA-87 keys. The X25519 key is not stored on chain; /app/try verifies this
+ * card against the ML-DSA-87 key and the ML-KEM-1024 key the chain has registered for the vendor.
+ */
+async function card(): Promise<void> {
+  // Read without the shape check: the card is what this step adds.
+  const fixture = JSON.parse(readFileSync(DEMO_FIXTURE, "utf8")) as DemoFixture;
+  const vendor = await demoAccount(fixture, "vendor");
+  const seal = deriveSealKeys({ mnemonic: fixture.vendor.mnemonic, index: 0 });
+  if (bytesToHex(seal.mlkemPublicKey) !== fixture.vendor.identityKem || bytesToHex(seal.x25519PublicKey) !== fixture.vendor.identityX25519Public) {
+    throw new Error("the fixture's vendor keys are not the ones derived from its mnemonic");
+  }
+  const signed = signRecipientCard({
+    chainId: CHAIN_ID,
+    address: vendor.cosmos,
+    keys: seal,
+    classicalKey: classicalKeyFromPrivate(hexToBytes(vendor.privateKey as Hex), "eth_secp256k1"),
+    pqKey: { secretKey: vendor.pqc.secretKey },
+  });
+  verifyRecipientCard({ card: signed, chainId: CHAIN_ID, address: vendor.cosmos, pqPublicKey: vendor.pqc.publicKey, mlkemPublicKey: seal.mlkemPublicKey });
+  fixture.vendor.mldsaPublic = bytesToHex(vendor.pqc.publicKey);
+  fixture.vendor.card = signed;
+  writeFileSync(DEMO_FIXTURE, `${JSON.stringify(fixture, null, 2)}\n`);
+  console.log(`signed the vendor's recipient card into ${DEMO_FIXTURE} (issued ${signed.issuedAt})`);
+}
+
 async function create(): Promise<void> {
   if (existsSync(DEMO_FIXTURE)) throw new Error(`${DEMO_FIXTURE} exists. Refusing to replace the published demo identities.`);
   const { directory } = JSON.parse(readFileSync("deployments/prekey-directory.json", "utf8")) as { directory: string };
@@ -97,7 +126,7 @@ async function create(): Promise<void> {
   const clientSeal = deriveSealKeys({ mnemonic: clientMnemonic, index: 0 });
   // The expiry is set at publish time; createBundle needs one to validate the shape.
   const { bundle, secrets } = createBundle(vendorSeal.mlkemPublicKey, 1);
-  const fixture: DemoFixture = {
+  const fixture: Omit<DemoFixture, "vendor"> & { vendor: Omit<DemoFixture["vendor"], "card" | "mldsaPublic"> } = {
     warning: DEMO_WARNING,
     network: "qorechain-diana",
     directory: directory.toLowerCase(),
@@ -251,9 +280,14 @@ async function plan(fixture: DemoFixture, accounts: { vendor: UnifiedAccount; cl
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
-  for (const arg of args) if (!["--create", "--broadcast", "--plan"].includes(arg)) throw new Error(`unknown argument ${arg}`);
+  for (const arg of args) if (!["--create", "--card", "--broadcast", "--plan"].includes(arg)) throw new Error(`unknown argument ${arg}`);
   if (args.includes("--create")) {
     await create();
+    await card();
+    return;
+  }
+  if (args.includes("--card")) {
+    await card();
     return;
   }
   if (!existsSync(DEMO_FIXTURE)) {

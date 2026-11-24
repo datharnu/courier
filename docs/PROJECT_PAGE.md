@@ -14,6 +14,7 @@ Courier delivers encrypted invoices and documents between QoreChain addresses, a
   - Demo vendor `qor1ee5ypk25qvppjs7hqk7fcvf354rkcc9sqcak0u` / `0xce6840d95403021943d705bc9c3131a5476c60b0`; demo client `qor1t5parjalqguchl9aptfw4wd5wwn9uhahusfkdu` / `0x5d03d1cbbf02398bfcbd0ad2eab9b473a65e5fb7`.
   - The page checks the demo vendor's bundle hash on chain: `0x0f13517a19a3a1df5a333553b0bff2384cb577cd076deac06a988a6fee4a4175`, live until 30 November 2026, 12:22 UTC, then renewed with `npm run renew -- --send` (next run before that time). If it has expired, the page says so.
   - Every run uses the vendor's last-resort prekey: the keys are public, so a one-time prekey could not stay one-time.
+  - Read from chain by the page: the bundle hash (`PrekeyDirectory`), the vendor's registered ML-KEM-1024 key (KEM registry, via a same-origin read-only rewrite), and both ML-DSA-87 keys (`pqcKeyStatus`). The vendor's X25519 key is not stored on chain; it comes in a recipient card that must verify under the vendor's on-chain ML-DSA-87 key. A swapped bundle is refused with `BUNDLE_HASH`, a swapped card key with `CARD`.
 - Verify the recorded bundles and receipt live against QoreChain Diana: https://courier-fawn-psi.vercel.app/app/receipt
 - Home: https://courier-fawn-psi.vercel.app
 - Code (Apache-2.0): https://github.com/datharnu/courier

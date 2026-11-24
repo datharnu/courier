@@ -71,6 +71,18 @@ function ChainCard({ chain, fixture }: { chain: DemoChain | null; fixture: DemoF
             ? "The chain holds a different ML-DSA-87 key for the demo client. The vendor will refuse its first message."
             : "The demo client has no registered ML-DSA-87 key on chain yet. The vendor will refuse its first message."}
       </p>
+      <p data-testid="vendor-registry" className={chain.registry.ok && chain.view.vendorRegistryKem ? "text-muted" : "text-refused"}>
+        {!chain.registry.ok
+          ? `Could not read the vendor's ML-KEM-1024 key from the chain's KEM registry: ${chain.registry.reason} The client will refuse with IDENTITY_KEM rather than use the demo file.`
+          : chain.view.vendorRegistryKem
+            ? `KEM registry: the vendor's registered ML-KEM-1024 key is ${short(chain.view.vendorRegistryKem)} (1,568 bytes). The client compares the bundle's identity key with it.`
+            : "KEM registry: the vendor has no registered ML-KEM-1024 key. The client will refuse with IDENTITY_KEM."}
+      </p>
+      <p data-testid="vendor-key" className={chain.vendorKey === "registered" ? "text-muted" : "text-refused"}>
+        {chain.vendorKey === "registered"
+          ? "The vendor's ML-DSA-87 key is registered on chain. The client checks the vendor's recipient card (its X25519 key) against it."
+          : "The vendor has no registered ML-DSA-87 key on chain. The client will refuse its recipient card with CARD."}
+      </p>
     </div>
   );
 }
@@ -145,8 +157,8 @@ export function TryDemo() {
       <section className="rounded-xl border border-line bg-surface/90 p-4 sm:p-5">
         <fieldset>
           <legend className="text-[14px] font-semibold">Relay</legend>
-          <div role="radiogroup" aria-label="Relay" className="mt-2 inline-flex rounded-xl border border-line-strong p-1">
-            {(["honest", "lying"] as const).map((mode) => (
+          <div role="radiogroup" aria-label="Relay" className="mt-2 inline-flex flex-wrap rounded-xl border border-line-strong p-1">
+            {(["honest", "lying", "lying-card"] as const).map((mode) => (
               <button
                 key={mode}
                 type="button"
@@ -154,10 +166,10 @@ export function TryDemo() {
                 aria-checked={relay === mode}
                 onClick={() => setRelay(mode)}
                 className={`min-h-10 rounded-lg px-4 text-[14px] font-medium ${
-                  relay === mode ? (mode === "lying" ? "bg-refused text-white" : "bg-brand text-on-brand") : "text-muted hover:text-ink"
+                  relay === mode ? (mode !== "honest" ? "bg-refused text-white" : "bg-brand text-on-brand") : "text-muted hover:text-ink"
                 }`}
               >
-                {mode === "honest" ? "Honest" : "Lying (swap the vendor's prekey bundle)"}
+                {mode === "honest" ? "Honest" : mode === "lying" ? "Lying (swap the vendor's prekey bundle)" : "Lying (swap the vendor's card key)"}
               </button>
             ))}
           </div>
@@ -199,7 +211,11 @@ export function TryDemo() {
               ? "The relay's bundle is not the one on chain. Nothing was sealed."
               : run.refusal?.code === "AEAD"
                 ? "A flipped byte failed the AEAD tag. The vendor dropped the message without decrypting it."
-                : run.refusal?.reason}
+                : run.refusal?.code === "CARD"
+                  ? "The vendor's recipient card does not verify under its on-chain keys. Nothing was sealed."
+                  : run.refusal?.code === "IDENTITY_KEM"
+                    ? "The bundle's identity ML-KEM key is not the one in the chain's KEM registry. Nothing was sealed."
+                    : run.refusal?.reason}
           </p>
           {run.refusal?.code === "BUNDLE_HASH" ? (
             <dl className="mt-3 grid gap-1 font-mono text-[12.5px] break-all">
@@ -219,6 +235,33 @@ export function TryDemo() {
           ) : null}
         </section>
       ) : null}
+      {run?.keys ? (
+        <section data-testid="key-checks" className="rounded-xl border border-line bg-surface/90 p-4 sm:p-5">
+          <h2 className="text-[15px] font-semibold tracking-[-0.01em]">What the client compared before sealing</h2>
+          <dl className="mt-3 grid gap-3 font-mono text-[12px] break-all">
+            <div>
+              <dt className="font-sans text-[13px] text-ink">Bundle hash (PrekeyDirectory)</dt>
+              <dd className={run.relayHash === run.chainHash ? "text-muted" : "text-refused"}>
+                chain says {short(run.chainHash)} · relay sent {short(run.relayHash)} · {run.relayHash === run.chainHash ? "match" : "differ"}
+              </dd>
+            </div>
+            <div>
+              <dt className="font-sans text-[13px] text-ink">Identity ML-KEM-1024 key (KEM registry)</dt>
+              <dd data-testid="kem-check" className={run.keys.registryKem === run.keys.bundleIdentityKem ? "text-muted" : "text-refused"}>
+                chain registry says {run.keys.registryKem ? short(run.keys.registryKem) : "nothing readable"} · bundle names {short(run.keys.bundleIdentityKem)} ·{" "}
+                {run.keys.registryKem === run.keys.bundleIdentityKem ? "match" : "differ"}
+              </dd>
+            </div>
+            <div>
+              <dt className="font-sans text-[13px] text-ink">X25519 card key (signed card, checked against the on-chain ML-DSA-87 and ML-KEM keys)</dt>
+              <dd data-testid="card-check" className={run.keys.cardVerified ? "text-muted" : "text-refused"}>
+                relay sent {short(run.keys.cardX25519)} ·{" "}
+                {run.keys.cardVerified ? "signature verifies" : run.refusal?.code === "CARD" ? "signature does not verify" : "not checked (an earlier check refused)"}
+              </dd>
+            </div>
+          </dl>
+        </section>
+      ) : null}
       {run?.outcome === "delivered" ? (
         <p data-testid="delivered" className="rounded-xl border border-paid/40 bg-paid-soft px-4 py-3 text-[14px] text-ink">
           Delivered. The bundle matched the chain, the vendor opened the message and {INVOICE_NAME}, and the reply came back
@@ -231,7 +274,7 @@ export function TryDemo() {
         <section aria-label="Relay" className="flex flex-col rounded-xl border border-dashed border-line-strong bg-canvas p-4">
           <div className="flex items-baseline justify-between gap-2">
             <h2 className="text-[15px] font-semibold tracking-[-0.01em]">What the relay sees</h2>
-            <span className={`font-mono text-[11px] ${relay === "lying" ? "text-refused" : "text-muted"}`}>{relay}</span>
+            <span className={`font-mono text-[11px] ${relay !== "honest" ? "text-refused" : "text-muted"}`}>{relay}</span>
           </div>
           <ol className="mt-3 flex flex-col gap-2" data-testid="relay-pane">
             {(run?.relay ?? []).length === 0 ? <li className="text-[13px] text-muted">Nothing yet.</li> : null}
@@ -261,8 +304,9 @@ export function TryDemo() {
           <li>
             Real: the handshake (X25519 x3 + ML-KEM-1024), the ML-DSA-87 signature on the first message, the double ratchet
             (XChaCha20-Poly1305), the file encryption, and every refusal are Courier&rsquo;s <code className="font-mono">src/ts</code> files, copied
-            unchanged except for the <code className="font-mono">.js</code> suffix on relative imports (CI checks the copy). The bundle hash is read live from PrekeyDirectory, and the client&rsquo;s key from the chain&rsquo;s PQC
-            registry.
+            unchanged except for the <code className="font-mono">.js</code> suffix on relative imports (CI checks the copy). Read from the chain on every page load: the bundle hash (PrekeyDirectory), the vendor&rsquo;s
+            registered ML-KEM-1024 key (KEM registry, through a same-origin read-only rewrite because the chain&rsquo;s REST API sends no CORS
+            headers), and both ML-DSA-87 keys (<code className="font-mono">pqcKeyStatus</code>).
           </li>
           <li>
             The relay runs in this page instead of on a server, so it can be told to lie. It never gets a key: it holds the bundle, the
@@ -275,9 +319,9 @@ export function TryDemo() {
             tests and the recorded testnet exchange.
           </li>
           <li>
-            The vendor&rsquo;s identity ML-KEM key and X25519 card key are taken from the demo file. The chain&rsquo;s REST API does not allow
-            reads from a browser, so this page does not re-read the KEM registry; <code className="font-mono">npm run demo:identities</code> checks
-            it before publishing.
+            The X25519 key is not stored on chain by QoreChain. It travels in the vendor&rsquo;s QoreSeal recipient card, which the relay hands
+            over; the client accepts it only if the card&rsquo;s signature verifies under the vendor&rsquo;s on-chain ML-DSA-87 key and the card names
+            the registry ML-KEM key. The card was signed offline with the public demo keys (<code className="font-mono">npm run demo:identities -- --card</code>).
           </li>
           <li>
             The ML-KEM ratchet step is set to every 2 messages (the default is 20), so the vendor&rsquo;s first reply already carries one.
