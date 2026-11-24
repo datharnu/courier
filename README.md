@@ -44,11 +44,12 @@ How can a judge try it right now? Open [courier-fawn-psi.vercel.app/app/try](htt
 11. [Repository map](#repository-map)
 12. [Roadmap](#roadmap)
 13. [Built during the hackathon](#built-during-the-hackathon)
-14. [AI disclosure](#ai-disclosure)
-15. [Evidence: testnet addresses](#evidence-testnet-addresses)
-16. [Evidence: directory, exchange, MemoPay, group, and Escrow carry](#evidence-directory-exchange-memopay-group-and-escrow-carry)
-17. [Evidence: bundle renewal calendar through judging](#evidence-bundle-renewal-calendar-through-judging)
-18. [Evidence: design decisions and cost breakdown](#evidence-design-decisions-and-cost-breakdown)
+14. [Credits](#credits)
+15. [AI disclosure](#ai-disclosure)
+16. [Evidence: testnet addresses](#evidence-testnet-addresses)
+17. [Evidence: directory, exchange, MemoPay, group, and Escrow carry](#evidence-directory-exchange-memopay-group-and-escrow-carry)
+18. [Evidence: bundle renewal calendar through judging](#evidence-bundle-renewal-calendar-through-judging)
+19. [Evidence: design decisions and cost breakdown](#evidence-design-decisions-and-cost-breakdown)
 
 ---
 
@@ -133,12 +134,26 @@ Everything below runs on QoreChain Diana (`qorechain-diana`, EVM chain ID `9800`
 
 ## Rubric and track mapping
 
+### Judging rubric (official weights)
+
+The [builder FAQ](https://build.qorechain.io/faq) scores every track on the same five criteria; jurors check the [track requirements](#track-requirements) under them. Each row points to evidence that already exists and can be checked in about a minute.
+
+| Criterion (weight) | Where to check it (in about a minute) | Honest limit |
+| --- | --- | --- |
+| **Works as described (25%)** | Open [/app/try](https://courier-fawn-psi.vercel.app/app/try), click Send message and invoice, then switch the relay to Lying: refused with `BUNDLE_HASH`, 0 bytes sealed. Open [/app/receipt](https://courier-fawn-psi.vercel.app/app/receipt) and click Verify all. From a clone, `npm run evidence` prints **35 passed, 0 failed** (no keys) and `npm test` runs 66 TypeScript tests and 40 Foundry tests, 0 failed. Full path: [Judge it in 5 minutes](#judge-it-in-5-minutes). | The relay runs in the page (`/app/try`) or on `127.0.0.1`; there is no hosted relay. Bundles last at most 7 days, so live `current()` checks depend on renewals ([calendar](#evidence-bundle-renewal-calendar-through-judging)); the `/app/try` demo vendor's bundle expires 30 November 2026 12:22 UTC unless renewed. |
+| **QoreChain tech usage (25%)** | `PrekeyDirectory` `0x3d9a…9c2d`, `DeliveryReceipts` `0x06b5…cb56` and `MemoPay` `0x0fef…d98c` ([addresses](#evidence-testnet-addresses)). `pqcVerify` / `pqcKeyStatus` call sites: [Where the PQC checks are](#where-the-pqc-checks-are-for-jurors). ML-DSA-87 key registration with proof of possession (`5AAF1F86…`, `9D4C276F…`) and an ML-KEM-1024 key in the chain's KEM registry (`9D191E8D…`), both read live by `/app/try`. Deploys, bundle publishes and the payment run in EVM windows opened by hybrid ML-DSA-87 transactions; fUSD paid through `MemoPay.pay` (`0xad3500fd…`). QoreSeal and QoreSign in `src/ts/`, Sign In With QoreChain on the relay inbox (`src/ts/relay.ts`), `@qorechain/mcp` in `npm run evidence`, QoreScan in `npm run cbom:check`. Hashes: [Evidence](#evidence-directory-exchange-memopay-group-and-escrow-carry), [demo identities](#the-apptry-demo-public-demo-keys). | All of this is on the Diana testnet. The pool 2 swap (`89BC9AAB…`) only bought fUSD for the `MemoPay` run, and SIWQ is an off-chain check. The deployer `spike` is shared by all four Haven entries, so a project-page badge proven by its transactions (for example smart accounts, which Courier does not use) does not by itself mean Courier uses that feature. |
+| **Post-quantum correctness and security (20%)** | Handshake: four X25519 terms plus ML-KEM-1024 encapsulation to a one-time prekey, never to the long-term identity KEM key ([How it works](#how-it-works), `docs/protocol.md`). Bundle hashes are bound by ML-DSA-87 on chain; a flipped signature byte reverts `SignatureInvalid` (`0x37e8456b`). The bundle's identity ML-KEM key must match the chain registry (`IDENTITY_KEM`), and the X25519 key must come in a card signed by the registered ML-DSA-87 key (`CARD`). Reordered, duplicated, replayed or tampered ratchet messages are refused with `COUNTER` or `AEAD` (`test/ts/ratchet-refusals.test.ts`). `npm run cbom:check` passes (no `ecrecover`; its self-test catches the fixture). [`THREAT_MODEL.md`](THREAT_MODEL.md), [Where each attack or failure stops](#where-each-attack-or-failure-stops). | Hybrid design: X25519 and XChaCha20-Poly1305 are classical parts. No external audit. One-way traffic does not rekey until the peer replies; when all one-time prekeys are used (and on every `/app/try` run) the last-resort prekey is reused; no skipped-message recovery. The relay can still drop or withhold traffic. See [Known limits](#known-limits). |
+| **Originality (15%)** | Recipient prekey bundles are bound to QoreChain addresses on chain with ML-DSA-87, so there is no operator key server to trust. The registered ML-KEM-1024 key is checked against the chain's registry in the browser before anything is sealed. Anyone can switch the relay to Lying on `/app/try` and watch the refusal. Delivery receipts and `MemoPay`'s ciphertext-hash-only payments tie a message to its payment, and in the recorded Haven Escrow carry the release followed the client's Courier receipt on `DeliveryReceipts`. | The handshake and ratchet follow published designs (X3DH/PQXDH, Double Ratchet, sparse post-quantum ratchet; see [Credits](#credits)). The new part is where the keys are vouched for and what the message is tied to, not a new primitive. |
+| **Clarity, UX and documentation (15%)** | [Demo video (2:32)](https://drive.google.com/file/d/1P5WucUYNApsJwSpqOjGl3RPNHud-PMBK/view); [Judge it in 5 minutes](#judge-it-in-5-minutes); `/app/try` shows each comparison as "chain says / relay sent"; [`THREAT_MODEL.md`](THREAT_MODEL.md), `docs/protocol.md`, [Repository map](#repository-map), [Known limits](#known-limits). | The video is a motion-graphics explainer with synthetic narration, not a screen recording of a live session. The `/app/try` identities are public demo keys (on purpose); browser-side publishing of a visitor's own bundle is not built. |
+
+### Track requirements
+
 Built for Build Before Q-Day (`https://build.qorechain.io/`), category bounty Encrypted Apps ("Build an application using post-quantum encryption for QoreChain-addressed recipients"; example projects include private messaging and document sharing). Deadline: 2 December 2026 at 23:59 UTC.
 
 | Requirement (exact hackathon wording) | Where Courier proves it | Honest limit |
 | --- | --- | --- |
 | ML-KEM-1024 encryption | Handshake encapsulates with ML-KEM-1024 to a one-time prekey (or last-resort prekey); file keys travel inside ratchet messages, never sealed to a long-term key. | Identity KEM key is published only for card checks; ratchet limits are in [Known limits](#known-limits). |
-| Registered recipient keys | `PrekeyDirectory` stores `keccak256` of canonical bundles; `current(owner)` is verified on chain before sealing ([addresses](#evidence-testnet-addresses)). The bundle's identity ML-KEM-1024 key must equal the key in the chain's KEM registry, and the X25519 key must come in a card signed by the account's registered ML-DSA-87 key; `/app/try` reads both registries from the browser. | 7-day max bundle lifetime; see [renewal calendar](#evidence-bundle-renewal-calendar-through-judging). |
+| Registered recipient keys | `PrekeyDirectory` stores `keccak256` of canonical bundles; `current(owner)` is verified on chain before sealing ([addresses](#evidence-testnet-addresses)). The bundle's identity ML-KEM-1024 key must equal the key in the chain's KEM registry, and the X25519 key must come in a card signed by the account's registered ML-DSA-87 key. `/app/try` reads `current(owner)`, the registered ML-DSA-87 keys and the vendor's registered ML-KEM-1024 key from the chain on every load, and refuses with `BUNDLE_HASH`, `IDENTITY_KEM` or `CARD` on a mismatch (no fallback to the demo file). | 7-day max bundle lifetime; see [renewal calendar](#evidence-bundle-renewal-calendar-through-judging). The browser reads the KEM registry through a read-only same-origin rewrite because the REST API sends no CORS headers. |
 | ML-DSA key binding | `PrekeyDirectory.publish` and `DeliveryReceipts.record` verify ML-DSA-87 signatures via `pqcVerify`; flipped signature bytes revert `SignatureInvalid` (`0x37e8456b`). | Binding covers bundle hashes and receipt ciphertext hashes; message contents never touch the chain. |
 | Client-side encryption and decryption | Clients seal and open all messages, files, and invoices locally; relay holds ciphertext only; `MemoPay` stores only `keccak256(ciphertext)` (132-byte calldata). | Safety numbers use SHA-256 (not Signal SHA-512); groups have no on-chain membership contract. |
 | Public GitHub repository under MIT or Apache-2.0 | `https://github.com/datharnu/courier`, Apache-2.0 (`LICENSE`). | No QCAI dashboard audit has been run (not required for Encrypted Apps). |
@@ -288,7 +303,47 @@ Live scripts (`npm run live`, `npm run deploy:directory`, `npm run deploy:memopa
 
 Built during Build Before Q-Day (November 2026; deadline 2 December 2026 at 23:59 UTC). First commit: `97c05cc` on 19 November 2026 (`Add the Courier README.`). Licence: Apache-2.0 (`LICENSE`).
 
-Credits: `@qorechain/sdk` 0.14.0, `@qorechain/pqc` 0.2.3, `@qorechain/qoreseal` 0.1.0, `@qorechain/qoresign` 0.1.0, `@qorechain/mcp` 0.1.1, `@qorechain/qorescan` 0.1.0; `haven-pq-kit` v0.1.0 (interface following `qore-pq-kit` by Adityaakr, Apache-2.0); `@noble/ciphers`, `@noble/hashes`, viem 2.47.6, `@cosmjs/stargate`, `forge-std`, TypeScript. Handshake follows the X3DH + ML-KEM-1024 shape and double-ratchet shape written fresh for QoreChain.
+Open-source libraries, kits and design references are credited in [Credits](#credits).
+
+---
+
+## Credits
+
+Built from the repository's dependency files: `package.json`, `apps/web/package.json` (versions as resolved in each `package-lock.json`) and `git submodule status`. Licences are taken from each package's own `package.json`. Transitive dependencies are not listed.
+
+**QoreChain kits and network packages**
+- `@qorechain/sdk` 0.14.0 (Apache-2.0)
+- `@qorechain/pqc` 0.2.3 (Apache-2.0), root and web app
+- `@qorechain/qoreseal` 0.1.0 (Apache-2.0), root and web app
+- `@qorechain/qoresign` 0.1.0 (Apache-2.0), root and web app
+- `@qorechain/mcp` 0.1.1 (Apache-2.0), used by `npm run evidence`
+- `@qorechain/qorescan` 0.1.0 (Apache-2.0, dev), used by `npm run cbom:check`
+- viem 2.47.6 (MIT), root and web app
+- `@cosmjs/stargate` 0.39.0 (Apache-2.0)
+
+**Post-quantum and crypto libraries**
+- `haven-pq-kit` v0.1.0 (Apache-2.0): git submodule `lib/haven-pq-kit` at commit `9fe7ac289f512e39bce6a2d5e31baeb98195519c`, and the npm dependency `github:datharnu/haven-pq-kit#v0.1.0` ([repository](https://github.com/datharnu/haven-pq-kit)). Its `PqAuth` interface follows the public design of [`qore-pq-kit`](https://github.com/Adityaakr/qore-pq-kit) by Adityaakr, Apache-2.0.
+- `@noble/ciphers` 2.4.0 (MIT), root and web app
+- `@noble/hashes` 2.4.0 (MIT), root and web app
+
+**Contracts toolchain**
+- Foundry (`forge`), Solidity 0.8.28 (`foundry.toml`: optimizer 200 runs, `via_ir`)
+- `forge-std` v1.17.0 (MIT OR Apache-2.0): git submodule `lib/forge-std` at commit `f3dae6e6ee381f25eb6a246f7da9b85c91a68219` ([repository](https://github.com/foundry-rs/forge-std))
+
+**Web app frameworks and UI** (`apps/web`)
+- Next.js (`next`) 16.4.6 (MIT), React and React DOM 19.1.1 (MIT)
+- Tailwind CSS 4.1.17 and `@tailwindcss/postcss` 4.1.17 (MIT, dev)
+- `framer-motion` 14.14.0 (MIT), `lucide-react` 1.77.0 (ISC)
+- Fonts: `@fontsource/familjen-grotesk`, `@fontsource/fragment-mono`, `@fontsource/newsreader` 5.3.0 (OFL-1.1)
+
+**Testing and tooling**
+- TypeScript 5.6.3 (Apache-2.0), `tsx` 4.19.4 (MIT), `@types/node` 22.19.1 (MIT)
+- Node's built-in `node:test` runner (`npm run test:ts`)
+- Vitest 3.2.4 (MIT), `@playwright/test` 1.65.1 (Apache-2.0), `@types/react` 19.1.16 and `@types/react-dom` 19.1.9 (MIT), all dev dependencies of `apps/web`
+
+**Design references and prior work**
+- The handshake is modelled on Signal's [PQXDH](https://signal.org/docs/specifications/pqxdh/) with the same four X25519 terms as [X3DH](https://signal.org/docs/specifications/x3dh/); the message ratchet follows the [Double Ratchet](https://signal.org/docs/specifications/doubleratchet/) shape, and the ML-KEM ratchet step is modelled on Signal's [sparse post-quantum ratchet](https://signal.org/blog/spqr/) (`docs/protocol.md`). The code was written fresh for QoreChain; no Signal code is used.
+- Demo video (not in this repository): built in Remotion; narration by an ElevenLabs synthetic voice; background track "Vastness" from Mixkit (see [AI disclosure](#ai-disclosure)).
 
 ---
 
