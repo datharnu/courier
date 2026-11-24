@@ -110,6 +110,7 @@ Everything below runs on QoreChain Diana (`qorechain-diana`, EVM chain ID `9800`
    ```
 5. Local replay UI and local relay:
    ```bash
+   npm ci --prefix apps/web   # once: installs the web app's own dependencies
    npm run web       # replays the recorded group run (sends nothing)
    npm run relay     # local relay on 127.0.0.1:8787 reading qorechain-diana; state saved to .relay-state.json
    ```
@@ -143,6 +144,24 @@ Built for Build Before Q-Day (`https://build.qorechain.io/`), category bounty En
 | Public GitHub repository under MIT or Apache-2.0 | `https://github.com/datharnu/courier`, Apache-2.0 (`LICENSE`). | No QCAI dashboard audit has been run (not required for Encrypted Apps). |
 | README, testnet addresses, and video (up to 3 min) | This single-file `README.md` holds all addresses, hashes, and limits; shot list in `docs/DEMO.md`. | [Demo video](https://drive.google.com/file/d/1P5WucUYNApsJwSpqOjGl3RPNHud-PMBK/view) (2:32). Motion-graphics explainer built from the recorded evidence, with synthetic narration (ElevenLabs); not a screen recording of a live session. |
 
+
+### Where the PQC checks are (for jurors)
+
+The two Solidity PQC items (`pqcVerify`, `pqcKeyStatus`) are checked by hand, so here is every call site.
+
+| Contract | What the ML-DSA-87 check protects | Call site |
+| --- | --- | --- |
+| `PrekeyDirectory` | Only the owner's ML-DSA-87 key can publish its prekey bundle hash | [`src/PrekeyDirectory.sol` L37](src/PrekeyDirectory.sol#L37) → `PqAuth.verify` |
+| `DeliveryReceipts` | Only the recipient's ML-DSA-87 key can record a delivery receipt in its name | [`src/DeliveryReceipts.sol` L64](src/DeliveryReceipts.sol#L64) → `PqAuth.verify` |
+
+All ML-DSA-87 checks go through the vendored kit `haven-pq-kit` (git submodule `lib/haven-pq-kit`, pinned at `9fe7ac2`; GitHub shows submodules only as a link, so the lines are linked here):
+
+- Precompile addresses: [`PqAuth.sol` L8–9](https://github.com/datharnu/haven-pq-kit/blob/9fe7ac289f512e39bce6a2d5e31baeb98195519c/src/PqAuth.sol#L8-L9) — `pqcVerify` `0x…0a01`, `pqcKeyStatus` `0x…0a02`.
+- `pqcVerify` call: [`PqAuth.verify`, L75–84](https://github.com/datharnu/haven-pq-kit/blob/9fe7ac289f512e39bce6a2d5e31baeb98195519c/src/PqAuth.sol#L75-L84); `pqcKeyStatus` call: [`PqAuth._status`, L95–105](https://github.com/datharnu/haven-pq-kit/blob/9fe7ac289f512e39bce6a2d5e31baeb98195519c/src/PqAuth.sol#L95-L105), used by [`_loadKey`, L86](https://github.com/datharnu/haven-pq-kit/blob/9fe7ac289f512e39bce6a2d5e31baeb98195519c/src/PqAuth.sol#L86) (registered, ML-DSA-87, possession proven, 2,592-byte key; fails closed).
+- Single-signer authorization (nonce, deadline, domain-separated message): [`PqAuth.authorize`, L45](https://github.com/datharnu/haven-pq-kit/blob/9fe7ac289f512e39bce6a2d5e31baeb98195519c/src/PqAuth.sol#L45).
+
+**Shared deployer.** `spike` (`qor143f0ghn8slqguwez73087dvq8lqnuuukqdu9fl`) deploys and relays for all four Haven entries (Courier, Haven Escrow, Haven Ledger, Steward). Project-page badges proven by its transactions do not by themselves mean this project uses that feature; `docs/kits.md` and this README say what this project uses.
+
 ---
 
 ## What works today
@@ -151,7 +170,7 @@ Built for Build Before Q-Day (`https://build.qorechain.io/`), category bounty En
 
 - Deployed `PrekeyDirectory`, `MemoPay`, and `DeliveryReceipts` on `qorechain-diana` with two live bundles (vendor and Carol), and completed the live exchange, `MemoPay` payment, three-member group run, and Haven Escrow file carry ([full hashes and details](#evidence-directory-exchange-memopay-group-and-escrow-carry)).
 - Live browser verification at `https://courier-fawn-psi.vercel.app/app/receipt` passed on 21 November 2026 at 390px and 1440px (0 horizontal overflow, 0 RPC errors).
-- `/app/try` against the live chain, no mocks (`COURIER_LIVE=1 npx playwright test e2e/try-live.spec.ts` in `apps/web`, on a local build, 23 November 2026): the page read `current(courier-demo-vendor)` = `0x0f13517a19a3a1df5a333553b0bff2384cb577cd076deac06a988a6fee4a4175` and the demo client's registered ML-DSA-87 key; the honest run delivered the message, `INV-0007.json`, and the vendor's reply with a 1,568-byte ML-KEM ratchet ciphertext; the lying relay was refused with `BUNDLE_HASH` (0 bytes sealed); a flipped byte was refused with `AEAD`. The deployed site needs a redeploy to serve `/app/try`.
+- `/app/try` against the live chain, no mocks (`COURIER_LIVE=1 npx playwright test e2e/try-live.spec.ts` in `apps/web`, on a local build, 23 November 2026): the page read `current(courier-demo-vendor)` = `0x0f13517a19a3a1df5a333553b0bff2384cb577cd076deac06a988a6fee4a4175` and the demo client's registered ML-DSA-87 key; the honest run delivered the message, `INV-0007.json`, and the vendor's reply with a 1,568-byte ML-KEM ratchet ciphertext; the lying relay was refused with `BUNDLE_HASH` (0 bytes sealed); a flipped byte was refused with `AEAD`.
 - CLI checks passed on 21 November 2026: `npm run evidence` (30 passed, 0 failed; 35 passed, 0 failed on 23 November with the `/app/try` demo accounts), `npm run cbom:check`, and `npm test` (Foundry + `node:test` lying-relay suite).
 
 ### Built, not observed
@@ -229,6 +248,7 @@ npm run cbom:check    # verifies no ecrecover and only PQC precompiles
 npm run evidence      # re-checks all 35 recorded testnet hashes (no keys)
 npm run relay         # relay on 127.0.0.1:8787, state in .relay-state.json
 npm run renew         # dry run: which project bundles (incl. the /app/try demo vendor) expire within 48 h (sends nothing)
+npm ci --prefix apps/web   # once, before npm run web: the web app has its own dependencies
 npm run web           # local replay UI (sends nothing)
 ```
 

@@ -17,7 +17,7 @@ import { CHAIN_ID, broadcast, evmClient, loadAccount } from "./lib/chain.js";
 import { DEMO_FIXTURE, demoAccount, loadDemo } from "./lib/demo.js";
 import { DIRECTORY_ABI, TTL, publishBundle } from "./lib/publish.js";
 import { createBundle } from "../src/ts/bundle.js";
-import { DEMO_CLIENT, DEMO_VENDOR, DEMO_WARNING, demoBundleHash, type DemoFixture } from "../apps/web/lib/try/demo-keys.js";
+import { DEMO_CLIENT, DEMO_VENDOR, DEMO_WARNING, demoBundleHash, type DemoFixture } from "./lib/web-demo-keys.js";
 
 /**
  * The two public demo identities behind /app/try: `courier-demo-vendor` and `courier-demo-client`.
@@ -84,7 +84,10 @@ function qor(uqor: bigint): string {
 
 function sameBytes(a: string | Uint8Array | undefined, b: Uint8Array): boolean {
   if (a === undefined) return false;
-  const bytes = typeof a === "string" ? hexToBytes((a.startsWith("0x") ? a : `0x${a}`) as Hex) : a;
+  // The chain's REST API returns keys as base64; other readers return hex. Accept both.
+  const hex = typeof a === "string" ? a.replace(/^0x/, "") : "";
+  const bytes =
+    typeof a !== "string" ? a : /^([0-9a-fA-F]{2})*$/.test(hex) ? hexToBytes(`0x${hex}`) : new Uint8Array(Buffer.from(a, "base64"));
   return bytes.length === b.length && bytes.every((byte, i) => byte === b[i]);
 }
 

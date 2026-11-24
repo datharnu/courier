@@ -5,6 +5,9 @@
   "license": "Apache-2.0",
   "type": "module",
   "description": "Courier: post-quantum messages that only the recipient's current device can read.",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "spike": "tsx scripts/spike-seal.ts",
     "deploy:directory": "forge build && tsx scripts/deploy-directory.ts",

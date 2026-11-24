@@ -8,7 +8,7 @@ import { demoAccount, loadDemo } from "./lib/demo.js";
 import { DIRECTORY_ABI, TTL, publishBundle } from "./lib/publish.js";
 import { prekeyPath, writePrivate } from "./lib/secrets.js";
 import { bundleHash, createBundle } from "../src/ts/bundle.js";
-import { DEMO_VENDOR, demoBundle } from "../apps/web/lib/try/demo-keys.js";
+import { DEMO_VENDOR, demoBundle } from "./lib/web-demo-keys.js";
 
 /**
  * Renews the project's PrekeyDirectory bundles before they expire.
